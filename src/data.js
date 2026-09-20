@@ -1,3 +1,5 @@
+import { sourceEquipment } from './source-assets.js';
+
 export const STORAGE_KEY = 'amms-demo-v1';
 export const roles = ['Requester', 'Technician', 'Planner', 'Supervisor', 'Admin'];
 export const permissions = {
@@ -12,32 +14,25 @@ const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); retur
 
 export function seed() {
   return {
+    schemaVersion: 2,
     role: 'Planner',
-    equipment: [
-      { id: 'EQ-001', name: 'Production', kind: 'Area', parentId: null, status: 'Operational', criticality: 'High', description: 'Sample production area' },
-      { id: 'EQ-002', name: 'Packaging line 1', kind: 'Line', parentId: 'EQ-001', status: 'Operational', criticality: 'High', description: 'Sample packaging line' },
-      { id: 'EQ-003', name: 'Bagging machine', kind: 'Machine', parentId: 'EQ-002', status: 'Attention', criticality: 'High', description: 'Sample bagging machine' },
-      { id: 'EQ-004', name: 'Sewing station', kind: 'Machine', parentId: 'EQ-002', status: 'Operational', criticality: 'Medium', description: 'Sample sewing station' },
-      { id: 'EQ-005', name: 'Packaging line 2', kind: 'Line', parentId: 'EQ-001', status: 'Operational', criticality: 'High', description: 'Sample packaging line' },
-      { id: 'EQ-006', name: 'Bag conveyor', kind: 'Machine', parentId: 'EQ-005', status: 'Operational', criticality: 'Medium', description: 'Sample conveyor' },
-      { id: 'EQ-007', name: 'Utilities', kind: 'Area', parentId: null, status: 'Operational', criticality: 'High', description: 'Sample shared utilities area' },
-      { id: 'EQ-008', name: 'Compressed air system', kind: 'System', parentId: 'EQ-007', status: 'Operational', criticality: 'High', description: 'Sample utility system' }
-    ],
+    language: 'fr',
+    equipment: sourceEquipment.map(x => ({ ...x })),
     requests: [
-      { id: 'IR-001', title: 'Intermittent bag feed stop', equipmentId: 'EQ-003', severity: 'S2', priority: 'P1', status: 'Approved', reportedBy: 'Shift operator', createdAt: day(-1), description: 'Bag feed pauses during the afternoon run.' },
-      { id: 'IR-002', title: 'Air pressure fluctuation', equipmentId: 'EQ-008', severity: 'S3', priority: 'P2', status: 'New', reportedBy: 'Utilities operator', createdAt: day(0), description: 'Pressure varies under peak load.' },
-      { id: 'IR-003', title: 'Conveyor guide adjustment', equipmentId: 'EQ-006', severity: 'S4', priority: 'P3', status: 'New', reportedBy: 'Line operator', createdAt: day(-2), description: 'Guide needs alignment.' }
+      { id: 'IR-001', title: 'Intermittent bag feed stop', equipmentId: 'EQ-139', severity: 'S3', priority: 'P1', status: 'Approved', reportedBy: 'Demo operator', createdAt: day(-1), description: 'Illustrative incident; not taken from the workbook.' },
+      { id: 'IR-002', title: 'Compressor pressure fluctuation', equipmentId: 'EQ-151', severity: 'S2', priority: 'P2', status: 'New', reportedBy: 'Demo operator', createdAt: day(0), description: 'Illustrative incident; not taken from the workbook.' },
+      { id: 'IR-003', title: 'Conveyor guide adjustment', equipmentId: 'EQ-141', severity: 'S1', priority: 'P3', status: 'New', reportedBy: 'Demo operator', createdAt: day(-2), description: 'Illustrative incident; not taken from the workbook.' }
     ],
     workOrders: [
-      { id: 'WO-001', title: 'Inspect bag feed sensor', equipmentId: 'EQ-003', requestId: 'IR-001', type: 'Corrective', priority: 'P1', status: 'In progress', assignee: 'Maintenance team', dueDate: day(1), notes: 'Check sensor alignment and wiring.' },
-      { id: 'WO-002', title: 'Inspect sewing head', equipmentId: 'EQ-004', requestId: null, type: 'Preventive', priority: 'P3', status: 'Planned', assignee: 'Maintenance team', dueDate: day(3), notes: 'Clean and check tension.' }
+      { id: 'WO-001', title: 'Inspect bag transfer', equipmentId: 'EQ-139', requestId: 'IR-001', type: 'Corrective', priority: 'P1', status: 'In progress', assignee: 'Demo maintenance team', dueDate: day(1), notes: 'Illustrative work instructions.' },
+      { id: 'WO-002', title: 'Inspect sewing head', equipmentId: 'EQ-131', requestId: null, type: 'Preventive', priority: 'P3', status: 'Planned', assignee: 'Demo maintenance team', dueDate: day(3), notes: 'Illustrative work instructions.' }
     ],
     preventive: [
-      { id: 'PM-001', title: 'Lubricate bag conveyor bearings', equipmentId: 'EQ-006', intervalDays: 30, nextDue: day(4), owner: 'Maintenance team', instructions: 'Isolate, inspect, lubricate and record findings.' },
-      { id: 'PM-002', title: 'Inspect compressed air filters', equipmentId: 'EQ-008', intervalDays: 14, nextDue: day(2), owner: 'Utilities team', instructions: 'Check differential pressure and replace if required.' }
+      { id: 'PM-001', title: 'Inspect conveyor bearings', equipmentId: 'EQ-141', intervalDays: 30, nextDue: day(4), owner: 'Demo maintenance team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' },
+      { id: 'PM-002', title: 'Inspect compressor filters', equipmentId: 'EQ-151', intervalDays: 14, nextDue: day(2), owner: 'Demo utilities team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' }
     ],
     reports: [
-      { id: 'SR-001', date: day(-1), shift: 'Day', author: 'Maintenance team', summary: 'Bag feed inspection started. No line 2 downtime recorded.', downtimeMinutes: 22, linkedWorkOrderId: 'WO-001' }
+      { id: 'SR-001', date: day(-1), shift: 'Day', author: 'Demo maintenance team', summary: 'Illustrative shift report; not an imported AGRIDIAM incident.', downtimeMinutes: 22, linkedWorkOrderId: 'WO-001' }
     ],
     parts: [
       { id: 'SP-001', name: 'Photoelectric sensor', sku: 'SENSOR-PE-01', quantity: 3, reorderPoint: 2, unit: 'pcs', location: 'Workshop A' },
@@ -45,8 +40,8 @@ export function seed() {
       { id: 'SP-003', name: 'Air filter element', sku: 'FILTER-AIR-01', quantity: 6, reorderPoint: 4, unit: 'pcs', location: 'Utilities store' }
     ],
     documents: [
-      { id: 'DOC-001', title: 'Bagging machine inspection checklist', category: 'Checklist', equipmentId: 'EQ-003', url: '', note: 'Sample record. Add a verified link when available.' },
-      { id: 'DOC-002', title: 'Compressed air service procedure', category: 'Procedure', equipmentId: 'EQ-008', url: '', note: 'Sample record. Add a verified link when available.' }
+      { id: 'DOC-001', title: 'Bagging inspection checklist', category: 'Checklist', equipmentId: 'EQ-139', url: '', note: 'Sample record. Add a verified link when available.' },
+      { id: 'DOC-002', title: 'Compressor service procedure', category: 'Procedure', equipmentId: 'EQ-151', url: '', note: 'Sample record. Add a verified link when available.' }
     ]
   };
 }
@@ -58,7 +53,27 @@ export function load(storage = globalThis.localStorage) {
     const data = JSON.parse(raw);
     const base = seed();
     for (const key of ['equipment', 'requests', 'workOrders', 'preventive', 'reports', 'parts', 'documents']) if (!Array.isArray(data[key])) data[key] = base[key];
+    if (data.schemaVersion !== 2) {
+      const originalTitles = {
+        requests: { 'IR-001': 'Intermittent bag feed stop', 'IR-002': 'Air pressure fluctuation', 'IR-003': 'Conveyor guide adjustment' },
+        workOrders: { 'WO-001': 'Inspect bag feed sensor', 'WO-002': 'Inspect sewing head' },
+        preventive: { 'PM-001': 'Lubricate bag conveyor bearings', 'PM-002': 'Inspect compressed air filters' },
+        documents: { 'DOC-001': 'Bagging machine inspection checklist', 'DOC-002': 'Compressed air service procedure' }
+      };
+      for (const [section, names] of Object.entries(originalTitles)) {
+        for (const item of data[section]) {
+          if (item.title === names[item.id]) Object.assign(item, base[section].find(x => x.id === item.id));
+        }
+      }
+      const sampleReport = data.reports.find(x => x.id === 'SR-001');
+      if (sampleReport?.summary === 'Bag feed inspection started. No line 2 downtime recorded.') Object.assign(sampleReport, base.reports[0]);
+      data.schemaVersion = 2;
+    }
+    const existing = new Set(data.equipment.map(x => x.id));
+    data.equipment = [...sourceEquipment.filter(x => !existing.has(x.id)).map(x => ({...x})), ...data.equipment];
+    for (const item of data.equipment) if (!item.source) item.source = 'Demo record';
     if (!roles.includes(data.role)) data.role = base.role;
+    if (!['en', 'fr'].includes(data.language)) data.language = 'fr';
     return data;
   } catch { return seed(); }
 }
@@ -71,7 +86,7 @@ export function equipmentPath(items, id) {
 }
 export function addRequest(data, value) {
   if (!value.title?.trim() || !data.equipment.some(x => x.id === value.equipmentId)) throw new Error('A title and valid equipment are required.');
-  const item = { id: nextId(data.requests, 'IR'), title: value.title.trim(), equipmentId: value.equipmentId, severity: value.severity || 'S3', priority: value.priority || 'P3', status: 'New', reportedBy: value.reportedBy?.trim() || 'Demo user', createdAt: day(), description: value.description?.trim() || '' };
+  const item = { id: nextId(data.requests, 'IR'), title: value.title.trim(), equipmentId: value.equipmentId, severity: value.severity || 'S2', priority: value.priority || 'P3', status: 'New', reportedBy: value.reportedBy?.trim() || 'Demo user', createdAt: day(), description: value.description?.trim() || '' };
   data.requests.unshift(item); return item;
 }
 export function createWorkOrder(data, value) {

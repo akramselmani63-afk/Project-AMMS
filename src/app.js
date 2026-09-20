@@ -1,4 +1,5 @@
 import { load, save, seed, roles, can, nextId, equipmentPath, addRequest, createWorkOrder, completePreventive } from './data.js';
+import { localize, localizeMessage } from './i18n.js';
 
 let db = load();
 let page = 'Overview';
@@ -16,7 +17,7 @@ const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const attr = esc;
 const equipmentName = id => db.equipment.find(x => x.id === id)?.name || 'Unassigned';
 const badge = (text, tone) => `<span class="badge ${tone || toneFor(text)}">${esc(text)}</span>`;
-const toneFor = text => ({ P1:'red', P2:'amber', P3:'blue', P4:'slate', S1:'red', S2:'amber', S3:'blue', S4:'slate', New:'blue', Approved:'green', Planned:'slate', 'In progress':'amber', Completed:'green', Operational:'green', Attention:'amber', Low:'red' })[text] || 'slate';
+const toneFor = text => ({ P1:'red', P2:'amber', P3:'blue', P4:'slate', S1:'slate', S2:'blue', S3:'amber', S4:'red', New:'blue', Approved:'green', Planned:'slate', 'In progress':'amber', Completed:'green', Operational:'green', Attention:'amber', Low:'red' })[text] || 'slate';
 const eqOptions = (selected = '') => db.equipment.filter(x => !['Area'].includes(x.kind)).map(x => `<option value="${x.id}" ${x.id === selected ? 'selected' : ''}>${esc(equipmentPath(db.equipment, x.id))}</option>`).join('');
 const empty = (message = 'No records match this view.') => `<div class="empty"><strong>Nothing to show</strong><p>${esc(message)}</p></div>`;
 const matches = (...values) => !query || values.some(x => String(x ?? '').toLowerCase().includes(query));
@@ -29,15 +30,16 @@ const today = () => new Date().toISOString().slice(0,10);
 function render() {
   const active = db.workOrders.filter(x => x.status !== 'Completed').length;
   app.innerHTML = `<div class="shell">
-    <aside class="sidebar" id="sidebar"><div class="brand"><span class="brand-mark">A</span><div><strong>AMMS</strong><small>AGRIDIAM MAINTENANCE</small></div></div>
+    <aside class="sidebar" id="sidebar"><div class="brand"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM" class="brand-logo"><span class="brand-subtitle">AMMS · MAINTENANCE</span></div>
       <div class="workspace-label">WORKSPACE <span>DEMO</span></div>
       <nav aria-label="Main navigation">${nav.map(([id,label]) => `<button class="nav-item ${page === id ? 'active' : ''}" data-page="${id}"><span class="nav-mark"></span>${label}${id === 'Work orders' ? `<em>${active}</em>` : ''}</button>`).join('')}</nav>
-      <div class="sidebar-foot"><strong>Prototype workspace</strong><p>Sample records are stored in this browser. AGRIDIAM source data has not been verified.</p></div>
+      <div class="sidebar-foot"><strong>Prototype workspace</strong><p>Machine names come from the permanence reports. Incidents, stock, status and schedules remain demo data.</p></div>
     </aside>
-    <main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Toggle menu">☰</button><div class="breadcrumb">AMMS <span>/</span> ${esc(page)}</div><div class="top-actions"><label class="search"><span>Search</span><input id="global-search" type="search" placeholder="Search current view" value="${attr(query)}" aria-label="Search current view"></label><span class="role-chip">${esc(db.role)}</span></div></header>
-    <div class="content"><div class="demo-banner"><span>DEMO DATA</span> Equipment names, activities and quantities shown here are illustrative until verified against AGRIDIAM records.</div>${view()}</div></main>
+    <main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Toggle menu">☰</button><div class="breadcrumb">AMMS <span>/</span> ${esc(page)}</div><div class="top-actions"><label class="search"><span>Search</span><input id="global-search" type="search" placeholder="Search current view" value="${attr(query)}" aria-label="Search current view"></label><label class="language-switch"><span class="sr-only">Language</span><select id="language-select" aria-label="Language"><option value="fr" ${db.language === 'fr' ? 'selected' : ''}>FR</option><option value="en" ${db.language === 'en' ? 'selected' : ''}>EN</option></select></label><span class="role-chip">${esc(db.role)}</span></div></header>
+    <div class="content"><div class="demo-banner"><span>DEMO DATA</span> The equipment catalogue is based on the AGRIDIAM permanence reports. Incidents, statuses, stock and schedules are illustrative.</div>${view()}</div></main>
     ${dialog ? modal() : ''}
   </div>`;
+  localize(app, db.language);
   if (dialog) document.querySelector('.modal input:not([type=hidden]), .modal select, .modal textarea')?.focus();
 }
 
@@ -68,15 +70,18 @@ function overview() {
 
 function equipment() {
   const parents = db.equipment.filter(x => x.parentId === null);
-  const selected = db.equipment.find(x => x.id === selectedEquipment) || parents[0];
-  const tree = (parentId, depth = 0) => db.equipment.filter(x => x.parentId === parentId).map(x => `<div class="tree-node" style="--depth:${depth}"><button data-select-equipment="${x.id}" class="tree-button ${selected?.id === x.id ? 'selected' : ''}"><span class="tree-glyph">${x.kind === 'Area' ? '▣' : x.kind === 'Line' ? '▤' : '◇'}</span><span>${esc(x.name)}</span><small>${esc(x.kind)}</small></button>${tree(x.id,depth+1)}</div>`).join('');
+  const matching = db.equipment.filter(x => matches(x.id,x.name,x.kind,x.source));
+  const visible = new Set();
+  for (const x of matching) { let current=x; const seen=new Set(); while(current && !seen.has(current.id)) { visible.add(current.id); seen.add(current.id); current=db.equipment.find(parent=>parent.id===current.parentId); } }
+  const selected = db.equipment.find(x => x.id === selectedEquipment && visible.has(x.id)) || (query ? matching[0] : parents[0]);
+  const tree = (parentId, depth = 0) => db.equipment.filter(x => x.parentId === parentId && visible.has(x.id)).map(x => `<div class="tree-node" style="--depth:${depth}"><button data-select-equipment="${x.id}" class="tree-button ${selected?.id === x.id ? 'selected' : ''}"><span class="tree-glyph">${x.kind === 'Area' ? '▣' : x.kind === 'Line' ? '▤' : '◇'}</span><span>${esc(x.name)}</span>${x.source === 'Demo record' ? '<span class="demo-tag">DEMO</span>' : ''}<small>${esc(x.kind)}</small></button>${tree(x.id,depth+1)}</div>`).join('');
   const related = db.workOrders.filter(x => x.equipmentId === selected?.id);
-  return `${header('Equipment register', 'Navigate areas, lines, systems and machines in one hierarchy.', btn('Add equipment','new-equipment',can(db.role,'equipment:manage'),'primary'))}<div class="equipment-layout"><section class="panel tree-panel"><div class="panel-head"><h2>Asset hierarchy</h2><small>${db.equipment.length} records</small></div>${tree(null)}</section><section class="panel detail-panel">${selected ? `<p class="eyebrow">${esc(selected.id)} · ${esc(selected.kind)}</p><h2>${esc(selected.name)}</h2><p class="muted">${esc(equipmentPath(db.equipment,selected.id))}</p><div class="detail-grid"><div><small>Status</small>${badge(selected.status)}</div><div><small>Criticality</small><strong>${esc(selected.criticality)}</strong></div><div><small>Parent</small><strong>${esc(equipmentName(selected.parentId))}</strong></div><div><small>Open work orders</small><strong>${related.filter(x => x.status !== 'Completed').length}</strong></div></div><h3>About this equipment</h3><p>${esc(selected.description || 'No description recorded.')}</p><h3>Related work</h3>${related.length ? related.map(x => `<div class="mini-row"><strong>${esc(x.id)} · ${esc(x.title)}</strong>${badge(x.status)}</div>`).join('') : empty('No linked work orders.')}` : empty('Select an asset.')}</section></div>`;
+  return `${header('Equipment register', 'Navigate areas, lines, systems and machines in one hierarchy.', btn('Add equipment','new-equipment',can(db.role,'equipment:manage'),'primary'))}<div class="equipment-layout"><section class="panel tree-panel"><div class="panel-head"><h2>Asset hierarchy</h2><small>${db.equipment.length} records</small></div><div class="tree-scroll">${matching.length ? tree(null) : empty()}</div></section><section class="panel detail-panel">${selected ? `<p class="eyebrow">${esc(selected.id)} · ${esc(selected.kind)}</p><h2>${esc(selected.name)}</h2><p class="muted">${esc(equipmentPath(db.equipment,selected.id))}</p><div class="detail-grid"><div><small>Status</small>${badge(selected.status)}</div><div><small>Criticality</small><strong>${esc(selected.criticality)}</strong></div><div><small>Parent</small><strong>${esc(equipmentName(selected.parentId))}</strong></div><div><small>Open work orders</small><strong>${related.filter(x => x.status !== 'Completed').length}</strong></div></div><h3>About this equipment</h3><p>${esc(selected.description || 'No description recorded.')}</p><div class="source-note"><strong>Source register</strong><span>${esc(selected.source || 'Demo record')}</span>${selected.sourceCell ? `<small>${esc(selected.sourceCell)}</small>` : ''}<p>Operating state and criticality are not verified.</p></div><h3>Related work</h3>${related.length ? related.map(x => `<div class="mini-row"><strong>${esc(x.id)} · ${esc(x.title)}</strong>${badge(x.status)}</div>`).join('') : empty('No linked work orders.')}` : empty('Select an asset.')}</section></div>`;
 }
 
 function requests() {
   const items = db.requests.filter(x => (filter === 'All' || x.status === filter) && matches(x.id,x.title,equipmentName(x.equipmentId),x.reportedBy,x.description));
-  return `${header('Intervention requests','Capture a problem, assess severity, then plan the work.',btn('New request','new-request',can(db.role,'request:create'),'primary'))}<div class="legend"><strong>Severity</strong> S1 safety or critical stop · S2 major disruption · S3 degraded operation · S4 minor issue <span></span><strong>Priority</strong> P1 immediate · P2 urgent · P3 planned · P4 routine</div>${filters(['All','New','Approved','Closed'])}${items.length ? rows(['Request','Equipment','Severity','Priority','Status','Reported','Action'],items.map(x => `<tr><td><strong>${esc(x.id)}</strong><small>${esc(x.title)}</small></td><td>${esc(equipmentName(x.equipmentId))}</td><td>${badge(x.severity)}</td><td>${badge(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.createdAt)}</td><td>${can(db.role,'request:triage') && x.status === 'New' ? `<button class="inline-button" data-action="triage:${x.id}">Triage</button>` : ''}${can(db.role,'work:create') && !db.workOrders.some(w => w.requestId === x.id) && x.status !== 'Closed' ? `<button class="inline-button" data-action="convert:${x.id}">Create WO</button>` : ''}</td></tr>`).join('')) : empty()}`;
+  return `${header('Intervention requests','Capture a problem, assess severity, then plan the work.',btn('New request','new-request',can(db.role,'request:create'),'primary'))}<div class="legend"><strong>Severity</strong> ${db.language === 'fr' ? 'S1 faible · S2 modérée · S3 élevée · S4 critique' : 'S1 low · S2 moderate · S3 high · S4 critical'} <span></span><strong>Priority</strong> ${db.language === 'fr' ? 'P1 immédiate · P2 urgente · P3 planifiée · P4 courante' : 'P1 immediate · P2 urgent · P3 planned · P4 routine'}</div>${filters(['All','New','Approved','Closed'])}${items.length ? rows(['Request','Equipment','Severity','Priority','Status','Reported','Action'],items.map(x => `<tr><td><strong>${esc(x.id)}</strong><small>${esc(x.title)}</small></td><td>${esc(equipmentName(x.equipmentId))}</td><td>${badge(x.severity)}</td><td>${badge(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.createdAt)}</td><td>${can(db.role,'request:triage') && x.status === 'New' ? `<button class="inline-button" data-action="triage:${x.id}">Triage</button>` : ''}${can(db.role,'work:create') && !db.workOrders.some(w => w.requestId === x.id) && x.status !== 'Closed' ? `<button class="inline-button" data-action="convert:${x.id}">Create WO</button>` : ''}</td></tr>`).join('')) : empty()}`;
 }
 function filters(values) { return `<div class="filters" role="group" aria-label="Status filter">${values.map(x => `<button class="filter ${filter === x ? 'active' : ''}" data-filter="${x}">${x}</button>`).join('')}</div>`; }
 
@@ -106,19 +111,19 @@ function documents() {
 }
 
 function roleView() {
-  return `${header('Roles & access','Explore prototype permissions using the demo role switcher.')}<section class="panel role-panel"><h2>Current role</h2><p>Choose a role to preview which maintenance actions appear. This is a demo control, not authentication.</p><label class="field"><span>Preview role</span><select id="role-select">${roles.map(x => `<option ${x === db.role ? 'selected' : ''}>${x}</option>`).join('')}</select></label><div class="role-grid">${roles.map(x => `<div><h3>${x}</h3><ul>${({Requester:['Submit requests'],Technician:['Submit requests','Update work orders','Write shift reports'],Planner:['Triage requests','Plan and update work','Manage PM, parts, equipment and documents'],Supervisor:['All planning and operational actions'],Admin:['All prototype actions']})[x].map(p => `<li>${p}</li>`).join('')}</ul></div>`).join('')}</div><div class="callout"><strong>Production note</strong><p>Accounts, server-side permissions, an audit trail and shared storage must be added before real operational use.</p></div><button class="text-button" data-action="reset">Reset demo records</button></section>`;
+  return `${header('Roles & access','Explore prototype permissions using the demo role switcher.')}<section class="panel role-panel"><h2>Current role</h2><p>Choose a role to preview which maintenance actions appear. This is a demo control, not authentication.</p><label class="field"><span>Preview role</span><select id="role-select">${roles.map(x => `<option value="${x}" ${x === db.role ? 'selected' : ''}>${x}</option>`).join('')}</select></label><div class="role-grid">${roles.map(x => `<div><h3>${x}</h3><ul>${({Requester:['Submit requests'],Technician:['Submit requests','Update work orders','Write shift reports'],Planner:['Triage requests','Plan and update work','Manage PM, parts, equipment and documents'],Supervisor:['All planning and operational actions'],Admin:['All prototype actions']})[x].map(p => `<li>${p}</li>`).join('')}</ul></div>`).join('')}</div><div class="callout"><strong>Production note</strong><p>Accounts, server-side permissions, an audit trail and shared storage must be added before real operational use.</p></div><button class="text-button" data-action="reset">Reset demo records</button></section>`;
 }
 
 function field(name,label,type='text',value='',required=false) { return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${attr(value)}" ${required ? 'required' : ''}></label>`; }
 function select(name,label,options,selected='') { return `<label class="field"><span>${label}</span><select name="${name}">${options.map(x => `<option value="${attr(x)}" ${x === selected ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`; }
-function eqField(selected='') { return `<label class="field"><span>Equipment</span><select name="equipmentId">${eqOptions(selected)}</select></label>`; }
+function eqField(selected='') { return `<label class="field"><span>Asset</span><select name="equipmentId">${eqOptions(selected)}</select></label>`; }
 function textarea(name,label,value='') { return `<label class="field full"><span>${label}</span><textarea name="${name}" rows="3">${esc(value)}</textarea></label>`; }
 function modal() {
   const [type,id] = dialog.split(':');
   const request = db.requests.find(x => x.id === id);
   const part = db.parts.find(x => x.id === id);
   const forms = {
-    'new-request': ['New intervention request', `${field('title','Problem title','text','',true)}${eqField()}${select('severity','Severity',['S1','S2','S3','S4'],'S3')}${select('priority','Priority',['P1','P2','P3','P4'],'P3')}${field('reportedBy','Reported by','text','Demo user')}${textarea('description','Description')}`],
+    'new-request': ['New intervention request', `${field('title','Problem title','text','',true)}${eqField()}${select('severity','Severity',['S1','S2','S3','S4'],'S2')}${select('priority','Priority',['P1','P2','P3','P4'],'P3')}${field('reportedBy','Reported by','text','Demo user')}${textarea('description','Description')}`],
     'new-work': ['New work order', `${field('title','Work title','text',request ? 'Investigate '+request.title : '',true)}${eqField(request?.equipmentId)}${select('type','Work type',['Corrective','Preventive'],'Corrective')}${select('priority','Priority',['P1','P2','P3','P4'],request?.priority || 'P3')}${field('assignee','Assigned to','text','Maintenance team')}${field('dueDate','Due date','date',today())}${textarea('notes','Work instructions')}${request ? `<input type="hidden" name="requestId" value="${request.id}">` : ''}`],
     'triage': ['Triage request', `${select('severity','Severity',['S1','S2','S3','S4'],request?.severity)}${select('priority','Priority',['P1','P2','P3','P4'],request?.priority)}${select('status','Decision',['New','Approved','Closed'],request?.status)}`],
     'new-equipment': ['Add equipment', `${field('name','Equipment name','text','',true)}${select('kind','Type',['Area','Line','System','Machine','Component'])}<label class="field"><span>Parent asset</span><select name="parentId"><option value="">Top level</option>${db.equipment.map(x => `<option value="${x.id}">${esc(equipmentPath(db.equipment,x.id))}</option>`).join('')}</select></label>${select('status','Status',['Operational','Attention','Out of service'])}${select('criticality','Criticality',['High','Medium','Low'],'Medium')}${textarea('description','Description')}`],
@@ -133,7 +138,7 @@ function modal() {
 }
 
 function commit() { save(db); render(); }
-function flash(message) { notice = message; let old = document.querySelector('.toast'); if (old) old.remove(); const el = document.createElement('div'); el.className='toast'; el.textContent=message; document.body.append(el); setTimeout(()=>el.remove(),3500); }
+function flash(message) { notice = message; let old = document.querySelector('.toast'); if (old) old.remove(); const el = document.createElement('div'); el.className='toast'; el.textContent=localizeMessage(message, db.language); document.body.append(el); setTimeout(()=>el.remove(),3500); }
 document.addEventListener('click', e => {
   const pageButton = e.target.closest('[data-page]'); if (pageButton) { page = pageButton.dataset.page; query=''; filter='All'; dialog=''; render(); return; }
   const eqButton = e.target.closest('[data-select-equipment]'); if (eqButton) { selectedEquipment=eqButton.dataset.selectEquipment; render(); return; }
@@ -151,7 +156,7 @@ document.addEventListener('click', e => {
   dialog = action === 'convert' ? `new-work:${id}` : button.dataset.action; render();
 });
 document.addEventListener('input', e => { if (e.target.id === 'global-search') { query=e.target.value.trim().toLowerCase(); const start=e.target.selectionStart; render(); const input=document.querySelector('#global-search'); input.focus(); input.setSelectionRange(start,start); } });
-document.addEventListener('change', e => { if (e.target.id === 'role-select') { db.role=e.target.value; commit(); flash(`Previewing ${db.role} access.`); } });
+document.addEventListener('change', e => { if (e.target.id === 'role-select') { db.role=e.target.value; commit(); flash(`Previewing ${db.role} access.`); } if (e.target.id === 'language-select') { db.language=e.target.value; commit(); } });
 document.addEventListener('submit', e => {
   if (e.target.id !== 'entry-form') return; e.preventDefault();
   const form=e.target; const type=form.dataset.form; const id=form.dataset.id; const v=Object.fromEntries(new FormData(form));
