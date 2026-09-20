@@ -1,0 +1,11 @@
+import { cp, mkdir, rm, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+const root = resolve('.');
+const dist = resolve('dist');
+for (const file of ['index.html','styles.css','src/app.js','src/data.js']) await readFile(resolve(root,file));
+await rm(dist,{recursive:true,force:true});
+await mkdir(dist,{recursive:true});
+await cp(resolve(root,'index.html'),resolve(dist,'index.html'));
+await cp(resolve(root,'styles.css'),resolve(dist,'styles.css'));
+await cp(resolve(root,'src'),resolve(dist,'src'),{recursive:true});
+console.log('Built static app in dist/');
