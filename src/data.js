@@ -1,7 +1,7 @@
 import { sourceEquipment } from './source-assets.js';
 
 export const STORAGE_KEY = 'amms-demo-v1';
-export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Service Achats', 'Developer Admin'];
+export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Purchasing Department', 'Developer Admin'];
 const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
 export function seed() {
@@ -64,7 +64,7 @@ export function load(storage = globalThis.localStorage) {
     const existing = new Set(data.equipment.map(x => x.id));
     data.equipment = [...sourceEquipment.filter(x => !existing.has(x.id)).map(x => ({...x})), ...data.equipment];
     for (const item of data.equipment) if (!item.source) item.source = 'Demo record';
-    if (!roles.includes(data.role)) data.role = ({Requester:'Employee',Technician:'Maintenance Engineer',Planner:'Maintenance Engineer',Supervisor:'Maintenance Responsible',Admin:'Developer Admin'})[data.role] || 'Maintenance Engineer';
+    if (!roles.includes(data.role)) data.role = ({Requester:'Employee',Technician:'Maintenance Engineer',Planner:'Maintenance Engineer',Supervisor:'Maintenance Responsible','Service Achats':'Purchasing Department',Admin:'Developer Admin'})[data.role] || 'Maintenance Engineer';
     if (!['en', 'fr'].includes(data.language)) data.language = 'fr';
     return data;
   } catch { throw new Error('Saved data could not be read. It has not been overwritten.'); }

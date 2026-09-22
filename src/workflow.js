@@ -1,12 +1,12 @@
 import { load as loadBase, seed as seedBase, nextId } from './data.js';
 
-export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','HSE','Service Achats','Developer Admin'];
+export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','HSE','Purchasing Department','Developer Admin'];
 const maintenance = ['Maintenance Engineer','Maintenance Responsible'];
 export const rights = {
   Employee: ['request'],
   'Maintenance Engineer': ['request','assess','work','equipment','pm','parts','accept','report','close'],
   'Maintenance Responsible': ['request','assess','approve','work','equipment','pm','parts','accept','report','close'],
-  HSE: ['hse'], 'Service Achats': ['purchase'], 'Developer Admin': ['backup']
+  HSE: ['hse'], 'Purchasing Department': ['purchase'], 'Developer Admin': ['backup']
 };
 export const can = (role, action) => rights[role]?.includes(action) || false;
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -24,7 +24,8 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
-  if (db.schemaVersion >= 4) return db;
+  if (db.schemaVersion >= 5) return db;
+  if (db.schemaVersion >= 4) return migrateSiteAssessment(db);
   if (db.schemaVersion >= 3) return migrateApprovals(db);
   db.role=roles.includes(db.role) ? db.role : 'Maintenance Engineer';
   db.partRequests ||= [];
@@ -55,7 +56,19 @@ function approvalStatus(r) {
 }
 function migrateApprovals(db) {
   for(const r of db.requests) if(reviewStages.includes(r.status)) r.status=approvalStatus(r);
-  db.schemaVersion=4; return db;
+  db.schemaVersion=4; return migrateSiteAssessment(db);
+}
+function migrateSiteAssessment(db) {
+  if(db.role==='Service Achats') db.role='Purchasing Department';
+  for(const w of db.workOrders) {
+    const r=db.requests.find(r=>r.id===w.requestId);
+    if(r?.issuedByResponsible && !r.hseApproval && w.status==='Awaiting approval') {
+      r.status='Site risk assessment';
+      w.status='Awaiting risk assessment';
+      if(!w.participants?.includes('Maintenance Engineer')) w.participants=['Maintenance Engineer',...(w.participants || [])];
+    }
+  }
+  db.schemaVersion=5; return db;
 }
 export function canReviewRequest(role,r) {
   return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
@@ -106,12 +119,23 @@ export function issueWork(db,v) {
   requireValue(db.role==='Maintenance Responsible','Only the Maintenance Responsible can issue a direct work order.');
   asset(db,v.equipmentId); required(v,'title'); required(v,'dueDate');
   requireValue(['P1','P2','P3','P4'].includes(v.priority),'Select priority.');
-  const participants=v.participants || ['Maintenance Responsible'];
+  const participants=v.participants || ['Maintenance Engineer'];
   requireValue(participants.length && participants.every(x=>maintenance.includes(x)),'Select maintenance participants.');
+  requireValue(participants.includes('Maintenance Engineer'),'Assign the Maintenance Engineer for the site risk assessment.');
   const r=addRequest(db,{...v,reportedBy:db.actor || db.role});
   r.issuedByResponsible=true;
-  assess(db,r.id,{...v,diagnosis:v.notes || '',risks:v.risks || []});
-  return createWork(db,r.id,{...v,participants});
+  Object.assign(r,{priority:v.priority,diagnosis:'',risks:[],status:'Site risk assessment'});
+  r.approval=audit(db,r,'Responsible approval');
+  const w={id:nextId(db.workOrders,'WO'),title:r.title,equipmentId:r.equipmentId,requestId:r.id,pmId:null,type:'Corrective',priority:r.priority,status:'Awaiting risk assessment',dueDate:v.dueDate,participants,external:v.external || '',notes:v.notes || '',history:[]};
+  db.workOrders.unshift(w); audit(db,w,'Work issued'); return w;
+}
+export function submitSiteRiskAssessment(db,id,v={}) {
+  requireValue(db.role==='Maintenance Engineer','Only the Maintenance Engineer can submit the site risk assessment.');
+  const w=record(db,'workOrders',id); stage(w,'Awaiting risk assessment');
+  requireValue(w.participants.includes('Maintenance Engineer'),'The Maintenance Engineer must be assigned to this work order.');
+  const r=record(db,'requests',w.requestId); stage(r,'Site risk assessment');
+  r.risks=v.risks || []; r.diagnosis=optional(v,'note'); r.siteAssessedBy=db.actor || db.role; r.siteAssessedAt=now(); r.status='HSE review';
+  audit(db,r,'Site risk assessment submitted',r.diagnosis); w.status='Awaiting approval'; audit(db,w,'Submitted to HSE',r.id); return r;
 }
 
 export const partsPending = (db,w) => db.partRequests.some(p=>p.workOrderId===w.id && !['Closed','Rejected','Cancelled'].includes(p.status) && p.acceptedQuantity<p.quantity);
@@ -147,7 +171,7 @@ export function closeWork(db,id,v) {
 }
 export function addPartRequest(db,v) {
   allow(db,'parts'); asset(db,v.equipmentId);
-  if(v.workOrderId) { const w=record(db,'workOrders',v.workOrderId); requireValue(w.equipmentId===v.equipmentId,'Part and work order must refer to the same equipment.'); stage(w,'Awaiting approval','Planned','In progress','Waiting for parts'); }
+  if(v.workOrderId) { const w=record(db,'workOrders',v.workOrderId); requireValue(w.equipmentId===v.equipmentId,'Part and work order must refer to the same equipment.'); stage(w,'Awaiting risk assessment','Awaiting approval','Planned','In progress','Waiting for parts'); }
   const quantity=number(v.quantity,1); requireValue(Number.isInteger(quantity),'Quantity must be a whole number.');
   const p={id:nextId(db.partRequests,'SPR'),title:required(v,'title'),reference:required(v,'reference'),equipmentId:v.equipmentId,workOrderId:v.workOrderId || null,quantity,unit:v.unit || 'pcs',description:optional(v,'description'),neededBy:required(v,'neededBy'),urgency:v.urgency || 'P3',equivalent:v.equivalent==='yes',photos:v.photos || [],status:db.role==='Maintenance Responsible'?'Purchasing':'Responsible review',createdAt:today(),requestedBy:db.actor || db.role,receivedQuantity:0,acceptedQuantity:0,rejectedQuantity:0,history:[],deliveries:[]};
   db.partRequests.unshift(p); audit(db,p,'Purchase requested');
@@ -203,7 +227,7 @@ export function approveReport(db,id,v) { allow(db,'approve'); const r=record(db,
 export function statusMatches(item,filter) {
   if(filter==='All') return true;
   if(filter==='New') return item.status==='Submitted' || item.status==='New';
-  if(filter==='Pending reviews') return ['Approval review','Responsible review','HSE review'].includes(item.status);
+  if(filter==='Pending reviews') return ['Site risk assessment','Approval review','Responsible review','HSE review'].includes(item.status);
   if(filter==='Closed') return ['Closed','Legacy completed'].includes(item.status);
   return item.status===filter;
 }
