@@ -22,10 +22,10 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 
 ## Workflows
 
-- Shared equipment register: every equipment selector uses the same IDs and full zone/machine hierarchy.
-- Intervention: employee reports problem, impact and photos → maintenance assessment (S1 low–S4 critical; P1 immediate–P4 routine) → Responsible approval → HSE precautions/approval → work order. Reviews can return or reject with a reason.
-- Execution: Engineer, Responsible, or both; optional external contractor. Start, wait for parts, resume, record diagnosis/cause/actions/downtime/final condition/operational check → HSE closure → maintenance validation. Solo work is validated by the other maintenance role. Joint work requires a documented exception to independent review.
-- Spare-parts purchasing: reference, specifications, quantity, due date, equivalent permission and photos → Responsible approval → Service Achats quotation/order → deliveries → maintenance technical acceptance → confirmation of use/handover. Partial deliveries and damaged/wrong parts remain outstanding for replacement. Linked work cannot start/resume/complete while requested parts await acceptance. There is no storekeeper or inventory workflow.
+- Shared equipment register: zones, machines and equipment details are combined in one expandable hierarchy. Every equipment selector uses the same IDs.
+- Intervention: employee reports problem, impact and photos → maintenance assessment (P1 immediate–P4 routine) → independent Responsible and HSE approvals in either order → work order. Reviews can return or reject; comments are optional. Both approvals are required before work starts. Returning or rejecting resets the approval flags while retaining history.
+- Execution: Engineer, Responsible, or both; optional external contractor. Start, wait for parts, resume, record optional diagnosis/cause/actions/final condition and downtime → HSE closure → maintenance validation. The Responsible can issue work orders directly from the Work orders page; issuance records MR authorization and only HSE approval remains before start. The Responsible can validate their own or joint work after HSE closure, without an engineer approval or written exception.
+- Spare-parts purchasing: reference, specifications, quantity, due date, equivalent permission and photos → Responsible approval → Service Achats quotation/order → deliveries → maintenance technical acceptance → confirmation of use/handover. Partial deliveries and damaged/wrong parts remain outstanding for replacement. Linked work cannot start/resume/complete while requested parts await acceptance. MR-created purchase requests go straight to Service Achats without a duplicate approval step. There is no storekeeper or inventory workflow.
 - Preventive plans generate interventions through the same approvals. One active intervention per plan; next due date advances after final closure.
 - Rapport de permanence snapshots work started/completed on the selected day, with observations and handover notes. The author specifies shift allocation in notes; a report is approved by the Responsible.
 - Print preview combines intervention authorization and work completion, including history, equipment and blank handwritten signature fields. Purchasing requests and reports are also printable. Use the browser print dialog to save PDF.
@@ -37,19 +37,23 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 | Role | Actions |
 | --- | --- |
 | Employee | Submit faults and photos; read records |
-| Maintenance Engineer | Assessment, planning/execution, PM, equipment, parts requests, technical receipt, reports; validate Responsible's solo work |
-| Maintenance Responsible | Same maintenance actions, plus intervention/purchase approval and report approval; can execute alone or jointly |
+| Maintenance Engineer | Assessment, planning/execution, PM, equipment, parts requests, technical receipt and reports |
+| Maintenance Responsible | Issue work orders directly; intervention/purchase/report approval; execute alone or jointly; validate own and engineer work after HSE closure |
 | HSE | Pre-work safety authorization and post-work safety closure |
 | Service Achats | Supplier/quotation/order and delivery recording |
 | Developer Admin | Development/diagnostics; no operational approval powers |
 
-Planning is a maintenance responsibility, not a separate user role. All demo roles can read records. The role switcher simulates permissions; it is **not authentication or a secure access boundary**. Names and role events in the history are not digital signatures.
+Planning is a maintenance responsibility, not a separate user role. All narrative notes/comments are optional; identifiers, selections and quantities still receive validation. The operational-check/witness field has been removed. All demo roles can read records. The role switcher simulates permissions; it is **not authentication or a secure access boundary**. Names and role events in the history are not digital signatures.
+
+The earlier dashboard arrangement is restored: four counters, priority work, upcoming preventive schedule, new requests and purchasing attention. Status tabs with counts are restored for requests, work orders, purchasing and reports. Only Priority is shown in forms, details and printouts; historical severity values are retained in old records without being used.
 
 ## Persistence and migration
 
 Records and resized photos are stored together in a browser IndexedDB transaction. Failed saves leave the current in-memory records unchanged. A revision check prevents a stale browser tab from overwriting newer changes; reload when prompted. Export backup downloads all current records and embedded photos as JSON; restoration currently requires developer assistance.
 
 The previous `amms-demo-v1` localStorage record is read once and retained unchanged as a migration backup. Custom equipment and records, legacy stock records, and document metadata are preserved. Old open work orders return to recorded approval review because the previous prototype did not capture HSE authorization. Previous status is retained in `legacyStatus`. Legacy completed work stays historical. Standalone Documents and inventory screens are removed; equipment shows its existing document metadata.
+
+Schema v4 migrates existing pending reviews to the independent-approval model without losing recorded approvals, photos or history. It applies to both existing IndexedDB workspaces and imported legacy localStorage data.
 
 ## Data provenance
 
@@ -63,7 +67,7 @@ The equipment catalogue is a curated subset of `3-Liste des machines` in `Rappor
 - `src/photos.js`: input checks and image resizing
 - `src/app.js`: bilingual forms, lists, record details and print previews
 
-Automated tests cover role gates, HSE review, both solo executors, joint-work exceptions, partial/rejected/replacement deliveries, work waiting for parts, common equipment IDs, preventive closure, report snapshots, migration and photo limits. Browser checks cover attachment save/reload, intervention approval/execution, purchasing acceptance, central equipment selectors, print preview, and responsive layout.
+Automated tests cover role gates, HSE review, both solo executors, MR validation of joint work, partial/rejected/replacement deliveries, work waiting for parts, common equipment IDs, preventive closure, report snapshots, migration and photo limits. Browser checks cover attachment save/reload, intervention approval/execution, purchasing acceptance, central equipment selectors, print preview, and responsive layout.
 
 ## Prototype boundary
 

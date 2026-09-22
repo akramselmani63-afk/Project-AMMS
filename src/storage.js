@@ -1,4 +1,4 @@
-import { load } from './workflow.js';
+import { load, migrate } from './workflow.js';
 
 // One IndexedDB transaction persists records and their photos together.
 // The previous localStorage record is retained as a migration backup.
@@ -15,7 +15,12 @@ export async function readWorkspace() {
       const request=db.transaction('workspace').objectStore('workspace').get('current');
       request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error);
     });
-    if(value) return value;
+    if(value) {
+      const previousVersion=value.schemaVersion;
+      migrate(value);
+      if(value.schemaVersion!==previousVersion) await writeWorkspace(value);
+      return value;
+    }
     const migrated=load(); await writeWorkspace(migrated); return migrated;
   } finally { db.close(); }
 }
