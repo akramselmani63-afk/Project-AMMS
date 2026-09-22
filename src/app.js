@@ -145,12 +145,37 @@ async function mutate(fn) { const next=structuredClone(db); const result=fn(next
 function printRecord() {
   const r=db[detail[0]].find(x=>x.id===detail[1]);
   const area=document.querySelector('#print-area');
-  const request=detail[0]==='workOrders'?db.requests.find(x=>x.id===r.requestId):null;
-  const work=detail[0]==='requests'?db.workOrders.find(x=>x.requestId===r.id):null;
-  const approval=request?`<h2>${t('Intervention authorization','Autorisation d’intervention')} · ${esc(request.id)}</h2><p>${esc(request.description)}</p><div class="detail-grid">${info(t('Priority','Priorité'),request.priority)}${info(t('HSE precautions','Précautions HSE'),request.precautions)}</div>${photos(request.photos)}`:'';
-  const completion=work?`<h2>${t('Work completion','Fin des travaux')} · ${esc(work.id)}</h2><div class="detail-grid">${info(t('Status','État'),label(work.status))}${info(t('Participants','Intervenants'),work.participants.map(label).join(' + '))}${info(t('Start / end','Début / fin'),`${work.startedAt || '—'} / ${work.completedAt || '—'}`)}${info(t('Actions performed','Travaux réalisés'),work.actions)}${info(t('Final condition','État final'),work.condition)}</div>`:'';
-  area.innerHTML=`<div class="print-controls">${button(t('Print / save PDF','Imprimer / enregistrer en PDF'),'print-now')}${button(t('Close preview','Fermer l’aperçu'),'close-print')}</div><div class="print-sheet"><header class="print-header"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM"><div><h1>${esc(r.id)} · ${esc(r.title || t('Shift report','Rapport de permanence'))}</h1><p>AMMS · ${t('Prototype record — verify before operational use','Document du prototype — vérifier avant utilisation opérationnelle')}</p></div></header><p>${esc(r.equipmentId?path(r.equipmentId):'')}</p><p>${t('Generated','Généré le')} : ${esc(new Date().toLocaleString(db.language))}</p>${approval}<div class="print-record">${document.querySelector('.record-panel').innerHTML}</div>${completion}<div class="signatures">${(detail[0]==='partRequests'?[t('Requested by','Demandeur'),t('Maintenance Responsible','Responsable maintenance'),t('Purchasing / receipt','Achats / réception')]:[t('Maintenance executor(s)','Intervenant(s) maintenance'),t('Maintenance Responsible','Responsable maintenance'),'HSE']).map(l=>`<div><strong>${l}</strong><p>${t('Name / date / signature','Nom / date / signature')}</p><div></div></div>`).join('')}</div></div>`;
-  area.querySelectorAll('.print-record button,.history').forEach(el=>el.remove()); area.classList.add('print-preview'); const sheet=area.querySelector('.print-sheet'); sheet.style.setProperty('--print-scale',Math.min(1,950/sheet.scrollHeight)); area.querySelector('button').focus();
+  const request=detail[0]==='workOrders'?db.requests.find(x=>x.id===r.requestId):detail[0]==='requests'?r:null;
+  const work=detail[0]==='workOrders'?r:detail[0]==='requests'?db.workOrders.find(x=>x.requestId===r.id):null;
+  const title=(request || work)?t('MAINTENANCE INTERVENTION SHEET','FICHE D’INTERVENTION MAINTENANCE'):t('AMMS RECORD','FICHE AMMS');
+  const equipmentId=work?.equipmentId || request?.equipmentId || r.equipmentId;
+  const priority=request?.priority || work?.priority || '—';
+  const problem=request?.description || work?.notes || '—';
+  const diagnosis=work?.diagnosis || request?.diagnosis || '—';
+  const actions=work?.actions || '—';
+  const finalCondition=work?.condition || '—';
+  const participants=(work?.participants || []).map(label).join(' + ') || '—';
+  const dates=work?((work.startedAt || '—')+' / '+(work.completedAt || '—')):(request?.createdAt || '—');
+  const downtime=work?.downtimeMinutes ?? '—';
+  area.innerHTML=`<div class="print-controls">${button(t('Print / save PDF','Imprimer / enregistrer en PDF'),'print-now')}${button(t('Close preview','Fermer l’aperçu'),'close-print')}</div><div class="print-sheet simple-intervention">
+    <header class="simple-print-header"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM"><div><h1>${title}</h1><p>AMMS · AGRIDIAM Maintenance Management System</p></div><strong>${esc(work?.id || request?.id || r.id)}</strong></header>
+    <table class="simple-print-table"><tbody>
+      <tr><th>${t('Equipment','Équipement')}</th><td colspan="3">${esc(equipmentId?path(equipmentId):'—')}</td></tr>
+      <tr><th>${t('Priority','Priorité')}</th><td>${esc(priority)}</td><th>${t('Date / time','Date / heure')}</th><td>${esc(dates)}</td></tr>
+      <tr><th>${t('Maintenance staff','Intervenant(s)')}</th><td>${esc(participants)}</td><th>${t('Downtime','Durée d’arrêt')}</th><td>${esc(downtime)} ${work?.downtimeMinutes!=null?'min':''}</td></tr>
+    </tbody></table>
+    <section class="simple-print-section"><h2>${t('Reported problem','Problème signalé')}</h2><p>${esc(problem)}</p></section>
+    <section class="simple-print-section"><h2>${t('Diagnosis','Diagnostic')}</h2><p>${esc(diagnosis)}</p></section>
+    <section class="simple-print-section"><h2>${t('Work performed','Travaux réalisés')}</h2><p>${esc(actions)}</p></section>
+    <section class="simple-print-section"><h2>${t('Final condition','État final')}</h2><p>${esc(finalCondition)}</p></section>
+    <div class="simple-signatures">
+      <div><strong>${t('Maintenance staff','Intervenant(s) maintenance')}</strong><span>${t('Name / signature','Nom / signature')}</span></div>
+      <div><strong>${t('Maintenance Responsible','Responsable maintenance')}</strong><span>${t('Name / signature','Nom / signature')}</span></div>
+      <div><strong>HSE</strong><span>${t('Name / signature','Nom / signature')}</span></div>
+    </div>
+  </div>`;
+  area.classList.add('print-preview');
+  area.querySelector('button')?.focus();
 }
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-page]'); if(nav && !busy) { page=nav.dataset.page; detail=null; dialog=null; query=''; viewFilter='All'; render(); return; }
