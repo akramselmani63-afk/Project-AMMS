@@ -58,3 +58,35 @@
 #print-area.print-preview{display:block;position:fixed;inset:0;overflow:auto;background:white;z-index:40;padding:35px max(20px,calc((100vw - 760px)/2));font-size:12px}#print-area .print-controls{display:flex;gap:10px;padding-bottom:25px}#print-area .record-actions{display:none}
 @media print{#print-area.print-preview{position:static;overflow:visible;padding:0}#print-area .print-controls{display:none}}
 @media print{@page{size:A4;margin:10mm}body{background:white;color:#111}.shell,.toast{display:none!important}#print-area{display:block;font-size:10px}#print-area .print-sheet{zoom:var(--print-scale,1);break-inside:avoid;page-break-inside:avoid}#print-area .record-actions,#print-area .history{display:none!important}#print-area .detail-grid{grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;padding:8px 0}#print-area .mini-row,#print-area figure{break-inside:avoid}#print-area .photo-grid{grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}#print-area .photo-grid img{max-height:75px}#print-area h2{font-size:14px;margin:10px 0 4px}#print-area h3{font-size:11px;margin:8px 0 3px}#print-area p{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}.badge{border:1px solid #bbb;background:white!important;color:#111!important}.print-header{border-bottom:2px solid #0b4e8b;padding-bottom:6px;margin-bottom:8px}.print-header img{width:110px}.print-header h1{font-size:16px}.signatures{gap:10px;margin-top:12px}.signatures>div{padding:8px}.signatures>div>div{height:38px}}
+
+
+/* Simple one-page intervention sheet: monochrome and limited to operational essentials. */
+.simple-intervention{color:#111;font-family:Arial,sans-serif;max-width:190mm;margin:0 auto}
+.simple-print-header{display:grid;grid-template-columns:42mm 1fr auto;align-items:center;gap:7mm;border:1px solid #111;padding:4mm;margin-bottom:3mm}
+.simple-print-header img{width:38mm;max-height:18mm;object-fit:contain}
+.simple-print-header h1{font-size:14px;margin:0 0 2px;text-align:center}
+.simple-print-header p{font-size:8px;margin:0;text-align:center}
+.simple-print-header>strong{font-size:10px;white-space:nowrap}
+.simple-print-table{width:100%;min-width:0;border-collapse:collapse;margin:0 0 3mm}
+.simple-print-table th,.simple-print-table td{border:1px solid #111;padding:2mm 2.5mm;font-size:9px;text-align:left;background:#fff;color:#111}
+.simple-print-table th{width:24mm;font-weight:700;text-transform:none;letter-spacing:0}
+.simple-print-section{border:1px solid #111;margin-bottom:2.5mm;padding:2.5mm;min-height:15mm}
+.simple-print-section h2{font-size:9px;margin:0 0 1.5mm;text-transform:uppercase}
+.simple-print-section p{font-size:9px;line-height:1.35;margin:0;white-space:pre-wrap}
+.simple-signatures{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:3mm}
+.simple-signatures>div{border:1px solid #111;min-height:22mm;padding:2.5mm}
+.simple-signatures strong,.simple-signatures span{display:block;font-size:8px}
+.simple-signatures span{margin-top:11mm;color:#333}
+@media print{
+  #print-area .simple-intervention{zoom:1!important}
+  #print-area .simple-print-header{border-bottom:1px solid #111;padding-bottom:4mm;margin-bottom:3mm}
+  #print-area .simple-print-header img{width:38mm}
+  #print-area .simple-print-header h1{font-size:14px;margin:0 0 2px}
+  #print-area .simple-print-header p{font-size:8px;margin:0}
+  #print-area .simple-print-table th,#print-area .simple-print-table td{padding:2mm 2.5mm;font-size:9px}
+  #print-area .simple-print-section{margin-bottom:2.5mm;padding:2.5mm}
+  #print-area .simple-print-section h2{font-size:9px;margin:0 0 1.5mm}
+  #print-area .simple-print-section p{font-size:9px;margin:0}
+  #print-area .simple-signatures{gap:0;margin-top:3mm}
+  #print-area .simple-signatures>div{padding:2.5mm;min-height:22mm}
+}
