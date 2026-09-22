@@ -4,8 +4,8 @@ export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible
 const maintenance = ['Maintenance Engineer','Maintenance Responsible'];
 export const rights = {
   Employee: ['request'],
-  'Maintenance Engineer': ['request','assess','work','equipment','pm','parts','accept','report','close'],
-  'Maintenance Responsible': ['request','assess','approve','work','equipment','pm','parts','accept','report','close'],
+  'Maintenance Engineer': ['request','assess','work','equipment','pm','parts','accept','report'],
+  'Maintenance Responsible': ['request','assess','approve','work','equipment','pm','parts','accept','report'],
   HSE: ['hse'], 'Purchasing Department': ['purchase'], 'Developer Admin': ['backup']
 };
 export const can = (role, action) => rights[role]?.includes(action) || false;
@@ -24,7 +24,8 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
-  if (db.schemaVersion >= 5) return db;
+  if (db.schemaVersion >= 6) return db;
+  if (db.schemaVersion >= 5) return migratePaperClosure(db);
   if (db.schemaVersion >= 4) return migrateSiteAssessment(db);
   if (db.schemaVersion >= 3) return migrateApprovals(db);
   db.role=roles.includes(db.role) ? db.role : 'Maintenance Engineer';
@@ -68,7 +69,14 @@ function migrateSiteAssessment(db) {
       if(!w.participants?.includes('Maintenance Engineer')) w.participants=['Maintenance Engineer',...(w.participants || [])];
     }
   }
-  db.schemaVersion=5; return db;
+  db.schemaVersion=5; return migratePaperClosure(db);
+}
+function migratePaperClosure(db) {
+  for(const w of db.workOrders.filter(w=>['HSE closure','Validation'].includes(w.status))) {
+    w.status='Closed';
+    const r=db.requests.find(r=>r.id===w.requestId); if(r) r.status='Closed';
+  }
+  db.schemaVersion=6; return db;
 }
 export function canReviewRequest(role,r) {
   return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
@@ -152,22 +160,15 @@ export function updateWork(db,id,action,v={}) {
     stage(w,'In progress'); requireValue(w.participants.includes(db.role),'Only an assigned participant can complete work.');
     requireValue(!partsPending(db,w),'Required spare parts are still awaiting acceptance.');
     const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),downtimeMinutes:number(v.downtimeMinutes || 0),repair:required(v,'repair')};
-    Object.assign(w,completion,{status:'HSE closure',completedAt:now()}); audit(db,w,'Work completed',w.actions);
+    Object.assign(w,completion,{status:'Closed',completedAt:now()}); audit(db,w,'Work completed',w.actions);
+    const request=record(db,'requests',w.requestId); request.status='Closed'; audit(db,request,'Closed with work order',w.id);
+    advancePreventive(db,w);
   }
 }
-export function closeWork(db,id,v) {
-  const w=record(db,'workOrders',id);
-  if(w.status==='HSE closure') { allow(db,'hse'); w.safetyClosure=audit(db,w,'HSE closure',optional(v,'note')); w.status='Validation'; return; }
-  stage(w,'Validation'); allow(db,'close');
-  const note=optional(v,'note');
-  requireValue(db.role==='Maintenance Responsible' || !w.participants.includes(db.role),'The Maintenance Responsible must validate engineer work.');
-  w.validation=audit(db,w,'Closed',note); w.status='Closed';
-  const r=record(db,'requests',w.requestId); r.status='Closed'; audit(db,r,'Closed with work order',w.id);
-  if(w.pmId) {
-    const p=record(db,'preventive',w.pmId); const d=new Date(`${today()}T12:00:00`); d.setDate(d.getDate()+Number(p.intervalDays));
-    p.nextDue=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    p.lastCompleted=today();
-  }
+function advancePreventive(db,w) {
+  if(!w.pmId) return;
+  const p=record(db,'preventive',w.pmId); const d=new Date(`${today()}T12:00:00`); d.setDate(d.getDate()+Number(p.intervalDays));
+  p.nextDue=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; p.lastCompleted=today();
 }
 export function addPartRequest(db,v) {
   allow(db,'parts'); asset(db,v.equipmentId);

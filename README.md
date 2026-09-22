@@ -24,7 +24,7 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 
 - Shared equipment register: zones, machines and equipment details are combined in one expandable hierarchy. Every equipment selector uses the same IDs.
 - Intervention: employee reports problem, impact and photos → maintenance assessment (P1 immediate–P4 routine) → independent Responsible and HSE approvals in either order → work order. Reviews can return or reject; comments are optional. Both approvals are required before work starts. Returning or rejecting resets the approval flags while retaining history.
-- Execution: Engineer, Maintenance Responsible, or both; optional external contractor. For a direct order, the Maintenance Responsible issues and assigns it → the Engineer visits the zone and records risks → the Engineer submits it to HSE → HSE approval → work starts. Completion records optional diagnosis/cause/actions/final condition and downtime → HSE closure → maintenance validation. The Maintenance Responsible can validate their own or joint work after HSE closure, without an engineer approval or written exception.
+- Execution: Engineer, Maintenance Responsible, or both; optional external contractor. For a direct order, the Maintenance Responsible issues and assigns it → the Engineer visits the zone and records risks → the Engineer submits it to HSE → HSE approval → work starts. Completion records optional diagnosis/cause/actions/final condition and downtime, then closes the digital record. Maintenance Responsible and HSE closure signatures are completed on the one-page printed sheet.
 - Spare-parts purchasing: reference, specifications, quantity, due date, equivalent permission and photos → Responsible approval → Purchasing Department quotation/order → deliveries → maintenance technical acceptance → confirmation of use/handover. Partial deliveries and damaged/wrong parts remain outstanding for replacement. Linked work cannot start/resume/complete while requested parts await acceptance. Maintenance Responsible purchase requests go straight to the Purchasing Department without a duplicate approval step. There is no storekeeper or inventory workflow.
 - Preventive plans generate interventions through the same approvals. One active intervention per plan; next due date advances after final closure.
 - Rapport de permanence snapshots work started/completed on the selected day, with observations and handover notes. The author specifies shift allocation in notes; a report is approved by the Responsible.
@@ -38,7 +38,7 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 | --- | --- |
 | Employee | Submit faults and photos; read records |
 | Maintenance Engineer | Assessment, planning/execution, PM, equipment, parts requests, technical receipt and reports |
-| Maintenance Responsible | Issue work orders directly; intervention/purchase/report approval; execute alone or jointly; validate own and engineer work after HSE closure |
+| Maintenance Responsible | Issue work orders directly; intervention/purchase/report approval; execute alone or jointly; sign completed work on paper |
 | HSE | Pre-work safety authorization and post-work safety closure |
 | Purchasing Department | Supplier/quotation/order and delivery recording (French: Service achats) |
 | Developer Admin | Development/diagnostics; no operational approval powers |
@@ -53,7 +53,7 @@ Records and resized photos are stored together in a browser IndexedDB transactio
 
 The previous `amms-demo-v1` localStorage record is read once and retained unchanged as a migration backup. Custom equipment and records, legacy stock records, and document metadata are preserved. Old open work orders return to recorded approval review because the previous prototype did not capture HSE authorization. Previous status is retained in `legacyStatus`. Legacy completed work stays historical. Standalone Documents and inventory screens are removed; equipment shows its existing document metadata.
 
-Schema v5 migrates existing pending reviews to the independent-approval model, renames Service Achats to Purchasing Department, and moves unapproved direct work orders to the Engineer site-risk step without losing recorded approvals, photos or history. It applies to both existing IndexedDB workspaces and imported legacy localStorage data.
+Schema v6 migrates existing pending reviews to the independent-approval model, renames Service Achats to Purchasing Department, moves unapproved direct work orders to the Engineer site-risk step, and closes records that were waiting for digital HSE or Responsible closure. It applies to both existing IndexedDB workspaces and imported legacy localStorage data.
 
 ## Data provenance
 
