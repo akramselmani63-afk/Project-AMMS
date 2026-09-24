@@ -2,7 +2,7 @@ import { sourceEquipment } from './source-assets.js';
 
 export const STORAGE_KEY = 'amms-demo-v1';
 export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Purchasing Department', 'Developer Admin'];
-const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export function seed() {
   return {
@@ -76,3 +76,4 @@ export function equipmentPath(items, id) {
   while (current && !seen.has(current.id)) { path.unshift(current.name); seen.add(current.id); current = items.find(x => x.id === current.parentId); }
   return path.join(' / ') || 'Unassigned';
 }
+
