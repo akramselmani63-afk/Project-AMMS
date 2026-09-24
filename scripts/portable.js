@@ -14,7 +14,7 @@ const logo = `data:image/png;base64,${(await readFile(resolve(root, 'assets/agri
 const assets = await source('src/source-assets.js', '', ['sourceTitle', 'sourceEquipment']);
 const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath']);
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
-  'roles', 'rights', 'can', 'today', 'localDay', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
+  'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
   'addRequest', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
   'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'addPM',
   'generatePM', 'addReport', 'reportActivities', 'interventionReports', 'approveReport', 'statusMatches'
