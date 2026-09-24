@@ -230,7 +230,7 @@ export function generatePM(db,id) {
 }
 export function addReport(db,v) {
   allow(db,'report'); const date=required(v,'date');
-  const activities=reportActivities(db,date);
+  const activities=interventionReports(db).filter(item=>item.date===date);
   const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',author:db.actor || db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
   db.reports.unshift(r); audit(db,r,'Report created'); return r;
 }
@@ -244,6 +244,13 @@ export function reportActivities(db,date='') {
     return {kind:'work',id:w.id,requestId:w.requestId,equipmentId:w.equipmentId,title:w.title,status:w.status,at:w.completedAt || w.startedAt || w.history?.[0]?.at || '',description:request?.description || '',diagnosis:w.diagnosis || request?.diagnosis || '',risks:request?.risks || [],cause:w.cause || '',actions:w.actions || '',result:[w.condition,w.repair].filter(Boolean).join(' · '),downtimeMinutes:w.downtimeMinutes || 0,startedAt:w.startedAt,completedAt:w.completedAt};
   });
   return [...requests,...work].sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+export function interventionReports(db) {
+  return db.requests.map(request=>{
+    const work=db.workOrders.find(item=>item.requestId===request.id);
+    const at=work?.completedAt || work?.startedAt || work?.history?.[0]?.at || request.createdAt;
+    return {id:work?.id || request.id,requestId:request.id,workOrderId:work?.id || null,title:request.title,equipmentId:request.equipmentId,priority:work?.priority || request.priority,status:work?.status || request.status,at,date:localDay(at),description:request.description || '',diagnosis:work?.diagnosis || request.diagnosis || '',risks:request.risks || [],cause:work?.cause || '',actions:work?.actions || '',result:[work?.condition,work?.repair].filter(Boolean).join(' · '),downtimeMinutes:work?.downtimeMinutes || 0,startedAt:work?.startedAt,completedAt:work?.completedAt};
+  }).sort((a,b)=>String(b.at).localeCompare(String(a.at)) || b.id.localeCompare(a.id));
 }
 export function approveReport(db,id,v) { allow(db,'approve'); const r=record(db,'reports',id); stage(r,'Draft'); r.approval=audit(db,r,'Report approved',optional(v,'note')); r.status='Approved'; }
 export function statusMatches(item,filter) {
