@@ -11,6 +11,13 @@ export const rights = {
 export const can = (role, action) => rights[role]?.includes(action) || false;
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const now = () => new Date().toISOString();
+export const localDay = value => {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+};
 const requireValue = (ok, message) => { if (!ok) throw new Error(message); };
 const required = (v, key) => { const text=String(v[key] || '').trim(); requireValue(text, `Required: ${key}`); return text; };
 const optional = (v,key) => String(v[key] || '').trim();
@@ -86,7 +93,7 @@ export const seed = () => migrate(seedBase());
 export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
-  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:required(v,'reportedBy'),createdAt:today(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
+  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:required(v,'reportedBy'),createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
   audit(db,r,'Submitted'); db.requests.unshift(r); return r;
 }
 export function assess(db,id,v) {
@@ -160,7 +167,10 @@ export function updateWork(db,id,action,v={}) {
     stage(w,'In progress'); requireValue(w.participants.includes(db.role),'Only an assigned participant can complete work.');
     requireValue(!partsPending(db,w),'Required spare parts are still awaiting acceptance.');
     const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),downtimeMinutes:number(v.downtimeMinutes || 0),repair:required(v,'repair')};
-    Object.assign(w,completion,{status:'Closed',completedAt:now()}); audit(db,w,'Work completed',w.actions);
+    const finish=v.completedAt ? new Date(v.completedAt) : new Date();
+    requireValue(!Number.isNaN(finish.getTime()),'Enter a valid completion time.');
+    if(w.startedAt) requireValue(finish >= new Date(w.startedAt),'Completion cannot be before work started.');
+    Object.assign(w,completion,{status:'Closed',completedAt:finish.toISOString()}); audit(db,w,'Work completed',w.actions);
     const request=record(db,'requests',w.requestId); request.status='Closed'; audit(db,request,'Closed with work order',w.id);
     advancePreventive(db,w);
   }
@@ -220,9 +230,20 @@ export function generatePM(db,id) {
 }
 export function addReport(db,v) {
   allow(db,'report'); const date=required(v,'date');
-  const activities=db.workOrders.filter(w=>[w.startedAt,w.completedAt].some(d=>d?.slice(0,10)===date)).map(w=>({id:w.id,equipmentId:w.equipmentId,title:w.title,status:w.status,actions:w.actions || '',downtimeMinutes:w.downtimeMinutes || 0}));
-  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',author:db.actor || db.role,summary:optional(v,'summary'),handover:v.handover || '',activities,status:'Draft',history:[]};
+  const activities=reportActivities(db,date);
+  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',author:db.actor || db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
   db.reports.unshift(r); audit(db,r,'Report created'); return r;
+}
+export function reportActivities(db,date='') {
+  const requests=db.requests.filter(r=>!date || localDay(r.createdAt)===date).map(r=>({kind:'request',id:r.id,requestId:r.id,equipmentId:r.equipmentId,title:r.title,status:r.status,at:r.createdAt,description:r.description || '',diagnosis:r.diagnosis || '',risks:r.risks || [],result:r.status,actions:'',cause:'',downtimeMinutes:0}));
+  const work=db.workOrders.filter(w=>{
+    const dates=[w.history?.find(e=>['Work planned','Work issued'].includes(e.action))?.at,w.startedAt,w.completedAt];
+    return !date || dates.some(value=>localDay(value)===date);
+  }).map(w=>{
+    const request=db.requests.find(r=>r.id===w.requestId);
+    return {kind:'work',id:w.id,requestId:w.requestId,equipmentId:w.equipmentId,title:w.title,status:w.status,at:w.completedAt || w.startedAt || w.history?.[0]?.at || '',description:request?.description || '',diagnosis:w.diagnosis || request?.diagnosis || '',risks:request?.risks || [],cause:w.cause || '',actions:w.actions || '',result:[w.condition,w.repair].filter(Boolean).join(' · '),downtimeMinutes:w.downtimeMinutes || 0,startedAt:w.startedAt,completedAt:w.completedAt};
+  });
+  return [...requests,...work].sort((a,b)=>String(b.at).localeCompare(String(a.at)));
 }
 export function approveReport(db,id,v) { allow(db,'approve'); const r=record(db,'reports',id); stage(r,'Draft'); r.approval=audit(db,r,'Report approved',optional(v,'note')); r.status='Approved'; }
 export function statusMatches(item,filter) {
@@ -232,3 +253,4 @@ export function statusMatches(item,filter) {
   if(filter==='Closed') return ['Closed','Legacy completed'].includes(item.status);
   return item.status===filter;
 }
+
