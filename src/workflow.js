@@ -238,9 +238,21 @@ export function generatePM(db,id) {
 }
 export function addReport(db,v) {
   allow(db,'report'); const date=required(v,'date');
-  const activities=interventionReports(db).filter(item=>item.date===date);
-  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',author:db.actor || db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
+  const equipmentId=v.equipmentId || null; if(equipmentId) asset(db,equipmentId);
+  const activities=interventionReports(db).filter(item=>item.date===date && inEquipmentScope(db,item.equipmentId,equipmentId));
+  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',equipmentId,author:db.actor || db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
   db.reports.unshift(r); audit(db,r,'Report created'); return r;
+}
+export function inEquipmentScope(db,equipmentId,scopeId) {
+  if(!scopeId) return true;
+  const seen=new Set();
+  let current=equipmentId;
+  while(current && !seen.has(current)) {
+    if(current===scopeId) return true;
+    seen.add(current);
+    current=db.equipment.find(item=>item.id===current)?.parentId;
+  }
+  return false;
 }
 export function reportActivities(db,date='') {
   const requests=db.requests.filter(r=>!date || localDay(r.createdAt)===date).map(r=>({kind:'request',id:r.id,requestId:r.id,equipmentId:r.equipmentId,title:r.title,status:r.status,at:r.createdAt,description:r.description || '',diagnosis:r.diagnosis || '',risks:r.risks || [],result:r.status,actions:'',cause:'',downtimeMinutes:0}));
