@@ -4,6 +4,8 @@ Responsive French/English CMMS prototype for AGRIDIAM's maintenance team. No app
 
 ## Run locally
 
+For a one-person offline prototype review, send `AMMS-Prototype.html` alone. The recipient can double-click it in a modern desktop browser; no Node.js or server is needed. Run `npm run portable` to regenerate that file after changing the app. Its records stay in the recipient's browser and are separate from yours. Browser storage for local files varies, so the recipient should export a backup before clearing browser data or moving the file. This portable copy is for workflow testing, not shared operational use.
+
 Requires Node.js 20 or later. Download the feature branch containing this version, extract the ZIP, and run from its folder:
 
 ```sh
@@ -28,7 +30,8 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 - The intervention printout follows the supplied AGRIDIAM example: branded title and OT number, equipment/priority/date/downtime/participants table, reported problem, diagnosis, work performed, final condition, and three paper signature areas.
 - Spare-parts purchasing: reference, specifications, quantity, due date, equivalent permission and photos → Responsible approval → Purchasing Department quotation/order → deliveries → maintenance technical acceptance → confirmation of use/handover. Partial deliveries and damaged/wrong parts remain outstanding for replacement. Linked work cannot start/resume/complete while requested parts await acceptance. Maintenance Responsible purchase requests go straight to the Purchasing Department without a duplicate approval step. There is no storekeeper or inventory workflow.
 - Preventive plans generate interventions through the same approvals. One active intervention per plan; next due date advances after final closure.
-- Rapport de permanence snapshots work started/completed on the selected day, with observations and handover notes. The author specifies shift allocation in notes; a report is approved by the Responsible.
+- Reports show requests and work orders automatically as they are recorded. Written shift reports add observations, diagnosis, risks, root cause, result and handover notes; their linked daily activity updates from the current records. The author specifies shift allocation in notes; a written report is approved by the Responsible.
+- Stored event times use UTC and display in the viewer's local time. The completion form defaults to the current time when submitted and allows an edited finish time.
 - Print preview combines intervention authorization and work completion, including history, equipment and blank handwritten signature fields. Purchasing requests and reports are also printable. Use the browser print dialog to save PDF.
 - Photos: up to four JPG/PNG/WebP files per intervention or parts request, maximum 8 MB input each. Photos can be added/removed before submission and are resized to at most 1200 pixels, converted to JPEG, and saved with the record. Image previews can be downloaded.
 - FR/EN translates interface labels, not free-text reports. Automatic content translation is not connected.
@@ -73,3 +76,4 @@ Automated tests cover role gates, Engineer site-risk submission, HSE review, bot
 ## Prototype boundary
 
 No shared server database, real accounts, protected audit log, remote notifications, automatic content translation or digital signatures are configured. Finalized records are read-only through this UI. This version is for workflow review on one browser; operational deployment still requires server-side authorization, shared storage/backups and AGRIDIAM validation of procedures and source data.
+
