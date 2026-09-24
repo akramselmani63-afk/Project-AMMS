@@ -62,6 +62,7 @@ Schema v6 migrates existing pending reviews to the independent-approval model, r
 ## Data provenance
 
 The equipment catalogue is a curated subset of `3-Liste des machines` in `Rapport de Permanence AGRIDIAM 2025.xlsb` and `Rapport de Permanence AGRIDIAM 2026-1.xlsb`. Each sourced entry carries a worksheet cell reference. Production and Conditionnement follow report department headings. Operating state and criticality are unverified; seeded incidents, work, schedules and reports are illustrative. Original workbooks, personnel and incident histories are not published in this repository.
+New equipment appears beside its sibling machines in the hierarchy and in all equipment selectors, including intervention requests, work orders, preventive plans, parts requests and shift reports.
 
 ## Code map and checks
 
