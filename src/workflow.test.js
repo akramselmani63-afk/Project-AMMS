@@ -139,6 +139,20 @@ test('shift report snapshots daily work; approval makes it final',()=>{
   db.role='Maintenance Responsible'; f.approveReport(db,r.id,{note:'Reviewed'}); assert.equal(r.status,'Approved');
   assert.throws(()=>f.approveReport(db,r.id,{note:'Again'}),/stage/);
 });
+test('shift report equipment scope includes machines beneath a selected zone',()=>{
+  const db=f.seed(); db.role='Maintenance Engineer';
+  const date=f.today();
+  db.requests.push({id:'IR-101',title:'Macro sample',equipmentId:'EQ-103',status:'New',createdAt:`${date}T10:00:00`});
+  db.requests.push({id:'IR-102',title:'Micro sample',equipmentId:'EQ-106',status:'New',createdAt:`${date}T11:00:00`});
+  const report=f.addReport(db,{date,equipmentId:'EQ-102'});
+  assert.equal(report.equipmentId,'EQ-102');
+  assert.ok(report.activities.some(item=>item.requestId==='IR-101'));
+  assert.ok(!report.activities.some(item=>item.requestId==='IR-102'));
+  assert.equal(f.inEquipmentScope(db,'EQ-103','EQ-101'),true);
+  assert.equal(f.inEquipmentScope(db,'EQ-106','EQ-102'),false);
+  assert.equal(f.addReport(db,{date}).equipmentId,null);
+  assert.throws(()=>f.addReport(db,{date,equipmentId:'missing'}),/valid equipment/);
+});
 test('one intervention report combines its request and work order',()=>{
   const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   const entries=f.interventionReports(db);
