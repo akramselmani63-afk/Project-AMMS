@@ -131,10 +131,23 @@ test('PM generates one open intervention and moves date when work is completed',
 });
 test('shift report snapshots daily work; approval makes it final',()=>{
   const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
-  const r=f.addReport(db,{date:f.today(),shift:'Day',summary:'Demo day',handover:'Follow up'});
-  assert.equal(r.activities[0].id,w.id); w.actions='Changed later'; assert.equal(r.activities[0].actions,'Replaced bearing');
+  const r=f.addReport(db,{date:f.today(),shift:'Day',summary:'Demo day',handover:'Follow up',diagnosis:'Bearing worn',risks:'Isolation',rootCause:'Wear',result:'Operational'});
+  assert.equal(r.activities.find(a=>a.id===w.id)?.actions,'Replaced bearing'); w.actions='Changed later'; assert.equal(r.activities.find(a=>a.id===w.id)?.actions,'Replaced bearing');
+  assert.equal(r.rootCause,'Wear'); assert.equal(r.result,'Operational');
+  assert.ok(f.reportActivities(db,r.date).some(a=>a.id===w.id && a.actions==='Changed later'));
+  assert.ok(f.reportActivities(db,r.date).some(a=>a.kind==='request' && a.id===w.requestId));
   db.role='Maintenance Responsible'; f.approveReport(db,r.id,{note:'Reviewed'}); assert.equal(r.status,'Approved');
   assert.throws(()=>f.approveReport(db,r.id,{note:'Again'}),/stage/);
+});
+test('completion records current time by default and accepts an edited local time',()=>{
+  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
+  const before=Date.now(); f.updateWork(db,w.id,'complete',completion);
+  assert.ok(new Date(w.completedAt).getTime()>=before);
+  const db2=f.seed(),w2=approved(db2); f.updateWork(db2,w2.id,'start');
+  const edited=new Date(Date.now()+60_000);
+  f.updateWork(db2,w2.id,'complete',{...completion,completedAt:`${edited.getFullYear()}-${String(edited.getMonth()+1).padStart(2,'0')}-${String(edited.getDate()).padStart(2,'0')}T${String(edited.getHours()).padStart(2,'0')}:${String(edited.getMinutes()).padStart(2,'0')}`});
+  assert.equal(new Date(w2.completedAt).getHours(),edited.getHours());
+  assert.equal(new Date(w2.completedAt).getMinutes(),edited.getMinutes());
 });
 test('migration preserves custom records, legacy status, parts and documents',()=>{
   const db=f.seed(); db.schemaVersion=2; db.requests.push({id:'IR-999',title:'User text',status:'New',photos:[{name:'keep.jpg'}]});
@@ -162,3 +175,4 @@ test('status tabs include existing new, approval-pending and historical closed r
  assert.equal(rows.filter(r=>f.statusMatches(r,'Closed')).length,2);
  assert.equal(rows.filter(r=>f.statusMatches(r,'Approved')).length,1);
 });
+
