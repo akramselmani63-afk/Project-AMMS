@@ -1,5 +1,5 @@
 import * as flow from './workflow.js';
-import { equipmentPath } from './data.js';
+import { equipmentPath, sortedEquipment } from './data.js';
 import { readWorkspace, writeWorkspace } from './storage.js';
 import { readPhotos } from './photos.js';
 
@@ -17,6 +17,7 @@ const statusTabs=(items,states)=>`<div class="filters" role="group" aria-label="
 const visibleRecords=items=>items.filter(x=>match(x) && flow.statusMatches(x,viewFilter));
 const allowed=action=>flow.can(db.role,action);
 const path=id=>equipmentPath(db.equipment,id);
+const orderedEquipment=()=>sortedEquipment(db.equipment,db.language);
 const match=x=>!query || [x.id,x.title,x.name,x.reference,x.status,x.description,path(x.equipmentId)].some(v=>String(v || '').toLowerCase().includes(query));
 const badge=value=>`<span class="badge ${['Closed','Approved','Accepted'].includes(value)?'green':['Rejected','P1'].includes(value)?'red':'blue'}">${esc(label(value || '—'))}</span>`;
 const button=(text,action,id='',enabled=true,primary=false)=>enabled?`<button type="button" class="button ${primary?'primary':'secondary'}" data-action="${action}" data-id="${esc(id)}">${text}</button>`:'';
@@ -25,7 +26,7 @@ const heading=(title,description,action='')=>`<div class="section-head"><div><p 
 const field=(name,title,type='text',value='',required=true)=>`<label class="field"><span>${title}</span><input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?'min="0" step="1"':''}></label>`;
 const textArea=(name,title,value='',required=false)=>`<label class="field full"><span>${title}${required?'':t(' (optional)',' (facultatif)')}</span><textarea name="${name}" rows="3" ${required?'required':''}>${esc(value)}</textarea></label>`;
 const select=(name,title,values,current='')=>`<label class="field"><span>${title}</span><select name="${name}">${values.map(v=>{const [value,text]=Array.isArray(v)?v:[v,label(v)];return `<option value="${esc(value)}" ${value===current?'selected':''}>${esc(text)}</option>`;}).join('')}</select></label>`;
-const equipmentField=(current='')=>select('equipmentId',t('Equipment / zone','Équipement / zone'),db.equipment.map(e=>[e.id,path(e.id)]),current);
+const equipmentField=(current='')=>select('equipmentId',t('Equipment / zone','Équipement / zone'),orderedEquipment().map(e=>[e.id,path(e.id)]),current);
 const checks=(name,title,values,current=[])=>`<fieldset class="field full checks"><legend>${title}</legend>${values.map(([v,l])=>`<label><input type="checkbox" name="${name}" value="${esc(v)}" ${current.includes(v)?'checked':''}> ${l}</label>`).join('')}</fieldset>`;
 const photoField=()=>`<div class="field full"><label for="photos">${t('Photos (optional)','Photos (facultatives)')}</label><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>${t('Up to 4 JPG, PNG or WebP photos, 8 MB each. Photos are resized for storage.','Jusqu’à 4 photos JPG, PNG ou WebP, 8 Mo chacune. Les photos sont redimensionnées pour le stockage.')}</small><div id="photo-preview" class="photo-grid"></div><p id="photo-error" role="alert"></p></div>`;
 const photos=items=>`<div class="photo-grid">${(items || []).filter(p=>/^data:image\/(jpeg|png|webp);base64,/.test(p.data)).map(p=>`<figure><a href="${esc(p.data)}" download="${esc(p.name)}"><img src="${esc(p.data)}" alt="${esc(p.name)}"></a><figcaption>${esc(p.name)}</figcaption></figure>`).join('')}</div>`;
@@ -80,12 +81,13 @@ function view() {
   return roleView();
 }
 function equipmentView() {
+  const ordered=orderedEquipment();
   const visible=new Set();
   for(const e of db.equipment.filter(match)) {
     let current=e; const seen=new Set();
     while(current && !seen.has(current.id)) { visible.add(current.id); seen.add(current.id); current=db.equipment.find(p=>p.id===current.parentId); }
   }
-  const tree=(parent,seen=new Set())=>db.equipment.filter(e=>(e.parentId || null)===parent && visible.has(e.id) && !seen.has(e.id)).map(e=>{
+  const tree=(parent,seen=new Set())=>ordered.filter(e=>(e.parentId || null)===parent && visible.has(e.id) && !seen.has(e.id)).map(e=>{
     const nextSeen=new Set([...seen,e.id]);
     const children=tree(e.id,nextSeen);
     return `<details class="equipment-node" ${query || parent===null?'open':''}><summary><strong>${esc(e.name)}</strong><span>${esc(e.id)} · ${esc(label(e.kind))}</span></summary><div class="equipment-node-body"><div class="detail-grid">${info(t('Operating state','État de fonctionnement'),label(e.status))}${info(t('Criticality','Criticité'),label(e.criticality))}</div>${e.description?`<p>${esc(e.description)}</p>`:''}<p class="source-note">${esc(e.source)} ${esc(e.sourceCell)}</p>${db.documents.filter(d=>d.equipmentId===e.id).map(d=>`<p>${esc(d.title)} · ${esc(d.note)}</p>`).join('')}${db.workOrders.filter(w=>w.equipmentId===e.id).map(w=>`<div class="mini-row"><strong>${esc(w.id)} · ${esc(w.title)}</strong>${badge(w.status)}${openButton('workOrders',w.id)}</div>`).join('')}${children?`<div class="equipment-children">${children}</div>`:''}</div></details>`;
@@ -147,9 +149,9 @@ function modal() {
     receive:[t('Record delivery','Enregistrer la livraison'),`${field('quantity',t('Quantity received in this delivery','Quantité reçue dans cette livraison'),'number',part?part.quantity-part.acceptedQuantity:1)}${field('deliveryReference',t('Delivery note reference','Référence bon de livraison'))}`],
     accept:[t('Technical acceptance','Réception technique'),`${field('acceptedQuantity',t('Accepted quantity from this delivery','Quantité acceptée de cette livraison'),'number',part?.deliveries.at(-1)?.quantity || 0)}${textArea('note',t('Conformity check / reason for rejected items','Contrôle de conformité / motif des pièces refusées'))}<p class="modal-context">${t('The remaining quantity is rejected and stays outstanding for replacement delivery.','La quantité restante est refusée et reste à livrer en remplacement.')}</p>`],
     'close-part':[t('Confirm use / handover','Confirmer utilisation / remise'),textArea('note',t('Where and by whom the parts were used or received','Où et par qui les pièces ont été utilisées ou reçues'))],
-    'new-equipment':[t('Add equipment','Ajouter un équipement'),`${field('name',t('Equipment name','Nom de l’équipement'))}${select('kind',t('Type','Type'),['Area','Line','System','Machine','Component'],'Machine')}${select('parentId',t('Parent equipment / zone','Équipement / zone parent'),[['',t('Top level','Niveau principal')],...db.equipment.map(e=>[e.id,path(e.id)])])}${textArea('description',t('Description','Description'),'',false)}`],
+    'new-equipment':[t('Add equipment','Ajouter un équipement'),`${field('name',t('Equipment name','Nom de l’équipement'))}${select('kind',t('Type','Type'),['Area','Line','System','Machine','Component'],'Machine')}${select('parentId',t('Parent equipment / zone','Équipement / zone parent'),[['',t('Top level','Niveau principal')],...orderedEquipment().map(e=>[e.id,path(e.id)])])}${textArea('description',t('Description','Description'),'',false)}`],
     'new-pm':[t('New preventive plan','Nouveau plan préventif'),`${field('title',t('Task','Tâche'))}${equipmentField()}${field('intervalDays',t('Interval in days','Périodicité en jours'),'number',30)}${field('nextDue',t('Next due','Prochaine échéance'),'date',flow.today())}${textArea('instructions',t('Instructions','Instructions'))}`],
-    'new-report':[t('New shift report','Nouveau rapport de permanence'),`${field('date',t('Date','Date'),'date',flow.today())}${select('shift',t('Shift','Poste'),['Day','Night'])}${select('equipmentId',t('Equipment / zone','Équipement / zone'),[['',t('All equipment','Tous les équipements')],...db.equipment.map(e=>[e.id,path(e.id)])])}${textArea('summary',t('Shift observations','Observations du poste'))}${textArea('handover',t('Handover / follow-up','Consignes / suivi'),'',false)}`],
+    'new-report':[t('New shift report','Nouveau rapport de permanence'),`${field('date',t('Date','Date'),'date',flow.today())}${select('shift',t('Shift','Poste'),['Day','Night'])}${select('equipmentId',t('Equipment / zone','Équipement / zone'),[['',t('All equipment','Tous les équipements')],...orderedEquipment().map(e=>[e.id,path(e.id)])])}${textArea('summary',t('Shift observations','Observations du poste'))}${textArea('handover',t('Handover / follow-up','Consignes / suivi'),'',false)}`],
     'approve-report':[t('Approve report','Approuver le rapport'),note]
   };
   const form=forms[type]; if(!form) return '';
