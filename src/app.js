@@ -4,7 +4,7 @@ import { readWorkspace, writeWorkspace } from './storage.js';
 import { readPhotos } from './photos.js';
 
 const app=document.querySelector('#app');
-let db, page='Overview', query='', viewFilter='All', detail=null, dialog=null, pendingPhotos=[], busy=false;
+let db, page='Overview', query='', viewFilter='All', reportTab='interventions', reportDate='all', detail=null, dialog=null, pendingPhotos=[], busy=false;
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,fr)=>db?.language==='fr'?fr:en;
 const localInputTime=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
@@ -32,7 +32,9 @@ const photos=items=>`<div class="photo-grid">${(items || []).filter(p=>/^data:im
 const info=(name,value)=>`<div><small>${name}</small><strong>${esc(value ?? '—')}</strong></div>`;
 const photoPreview=()=>pendingPhotos.map((photo,index)=>`<div>${photos([photo])}${button(t('Remove photo','Retirer la photo'),'remove-photo',String(index))}</div>`).join('');
 const history=item=>`<details class="history"><summary>${t('Activity & approvals','Historique et validations')} (${item.history?.length || 0})</summary>${(item.history || []).map(e=>`<div class="mini-row"><div><strong>${esc(label(e.role))} · ${esc(e.actor)}</strong><small>${esc(label(e.action))} · ${esc(displayTime(e.at))}</small><p>${esc(e.note)} ${esc(e.exception || '')}</p></div></div>`).join('')}</details>`;
-const reportActivity=a=>`<article class="report-activity"><div class="panel-head"><div><strong>${esc(a.id)} · ${esc(a.title)}</strong><p class="legend">${t(a.kind==='work'?'Work order':'Intervention request',a.kind==='work'?'Ordre de travail':'Demande d’intervention')} · ${esc(path(a.equipmentId))} · ${esc(displayTime(a.at))}</p></div>${badge(a.status)}</div><div class="detail-grid">${info(t('Observed problem','Problème constaté'),a.description)}${info(t('Diagnosis','Diagnostic'),a.diagnosis)}${info(t('Risks','Risques'),(a.risks || []).map(label).join(', '))}${info(t('Root cause','Cause racine'),a.cause)}${info(t('Work performed','Travaux réalisés'),a.actions)}${info(t('Result / final condition','Résultat / état final'),a.result)}</div>${a.kind==='work'?`<p class="legend">${t('Start','Début')}: ${esc(displayTime(a.startedAt))} · ${t('Completion','Fin')}: ${esc(displayTime(a.completedAt))} · ${t('Downtime','Durée d’arrêt')}: ${a.downtimeMinutes} min</p>`:''}${openButton(a.kind==='work'?'workOrders':'requests',a.id)}</article>`;
+const reportOpenButton=a=>button(t('Open report','Ouvrir la fiche'),'open-report-intervention',`${a.workOrderId?'workOrders':'requests'}:${a.id}`);
+const interventionCard=a=>`<article class="intervention-report-card"><div class="intervention-card-head"><div><span class="eyebrow">${esc(a.requestId)}${a.workOrderId?` · ${esc(a.workOrderId)}`:''}</span><h3>${esc(a.title)}</h3></div>${badge(a.status)}</div><p class="intervention-card-asset">${esc(path(a.equipmentId))}</p><div class="intervention-card-facts"><span>${t('Priority','Priorité')} <strong>${esc(a.priority || '—')}</strong></span><span>${esc(displayTime(a.at))}</span></div><p class="intervention-card-description">${esc(a.description || a.diagnosis || '—')}</p><div class="intervention-card-foot"><span>${a.result?`${t('Result','Résultat')}: ${esc(a.result)}`:t('Awaiting completion','En attente de fin des travaux')}</span>${reportOpenButton(a)}</div></article>`;
+const linkedIntervention=a=>`<div class="mini-row"><div><strong>${esc(a.id)} · ${esc(a.title)}</strong><small>${esc(path(a.equipmentId))} · ${esc(label(a.status))}</small></div>${reportOpenButton(a)}</div>`;
 const openButton=(collection,id)=>button(t('Open','Ouvrir'),'open',`${collection}:${id}`);
 function table(items,collection,extra=()=> '') {
   if(!items.length) return empty();
@@ -67,8 +69,13 @@ function view() {
   if(page==='Equipment') return equipmentView();
   if(page==='Preventive') return heading(t('Preventive maintenance','Maintenance préventive'),t('Generate an intervention for review; the next date advances after work closure.','Créez une intervention à valider ; la prochaine échéance avance après clôture.'),button(t('New PM plan','Nouveau plan préventif'),'new-pm','',allowed('pm'),true))+`<div class="cards-grid">${db.preventive.filter(match).map(p=>`<article class="pm-card"><p class="eyebrow">${esc(p.id)} · ${esc(p.nextDue)}</p><h2>${esc(p.title)}</h2><p>${esc(path(p.equipmentId))}</p><p>${esc(p.instructions)}</p><p>${t('Interval','Périodicité')} : ${p.intervalDays} ${t('days','jours')}</p>${button(t('Generate intervention','Créer une intervention'),'generate-pm',p.id,allowed('pm'))}</article>`).join('')}</div>`;
   if(page==='Reports') {
-    const automatic=flow.reportActivities(db).filter(match);
-    return heading(t('Shift reports','Rapports de permanence'),t('Interventions and work orders appear automatically. Add a shift report for observations, diagnosis and handover.','Les interventions et OT apparaissent automatiquement. Ajoutez un rapport de poste pour les observations, le diagnostic et les consignes.'),button(t('New shift report','Nouveau rapport'),'new-report','',allowed('report'),true))+`<h2>${t('Written shift reports','Rapports de poste rédigés')}</h2>`+statusTabs(db.reports,['All','Draft','Approved'])+`<div class="report-list">${visibleRecords(db.reports).map(r=>`<article class="report"><div class="report-date"><strong>${esc(r.date)}</strong><span>${esc(label(r.shift))}</span>${badge(r.status)}</div><div><h2>${esc(r.summary || r.id)}</h2><p>${esc(r.author)}</p>${openButton('reports',r.id)}</div></article>`).join('') || empty()}</div><section class="panel"><div class="panel-head"><div><p class="eyebrow">${t('AUTOMATIC RECORD','ENREGISTREMENT AUTOMATIQUE')}</p><h2>${t('Interventions and work','Interventions et travaux')}</h2></div><span>${automatic.length}</span></div><p class="legend">${t('Every request and work order is shown here as it changes.','Chaque demande et ordre de travail apparaît ici au fil des changements.')}</p>${automatic.map(reportActivity).join('') || empty()}</section>`;
+    const interventions=flow.interventionReports(db);
+    const tabs=`<div class="report-tabs" role="group" aria-label="${t('Report type','Type de rapport')}"><button type="button" data-report-tab="interventions" aria-pressed="${reportTab==='interventions'}" class="${reportTab==='interventions'?'active':''}">${t('Intervention reports','Rapports d’intervention')} <span>${interventions.length}</span></button><button type="button" data-report-tab="shift" aria-pressed="${reportTab==='shift'}" class="${reportTab==='shift'?'active':''}">${t('Shift reports','Rapports de permanence')} <span>${db.reports.length}</span></button></div>`;
+    if(reportTab==='shift') return heading(t('Reports','Rapports'),t('Write a shift report with observations and handover notes.','Rédigez un rapport de poste avec observations et consignes.'),button(t('New shift report','Nouveau rapport'),'new-report','',allowed('report'),true))+tabs+statusTabs(db.reports,['All','Draft','Approved'])+`<div class="report-list">${visibleRecords(db.reports).map(r=>`<article class="report"><div class="report-date"><strong>${esc(r.date)}</strong><span>${esc(label(r.shift))}</span>${badge(r.status)}</div><div><h2>${esc(r.summary || r.id)}</h2><p>${esc(r.author)}</p>${openButton('reports',r.id)}</div></article>`).join('') || empty()}</div>`;
+    const dates=[...new Set(interventions.map(item=>item.date || 'unknown'))];
+    const shown=interventions.filter(item=>match(item) && (reportDate==='all' || item.date===reportDate));
+    const groups=[...new Set(shown.map(item=>item.date || 'unknown'))];
+    return heading(t('Reports','Rapports'),t('One report per intervention, grouped by the latest activity date.','Un rapport par intervention, classé selon la date de la dernière activité.'),button(t('New shift report','Nouveau rapport'),'new-report','',allowed('report'),true))+tabs+`<div class="report-toolbar"><p>${t('Each card combines the request and its work order. Open it for diagnosis, risks, cause, work and result.','Chaque fiche réunit la demande et son OT. Ouvrez-la pour le diagnostic, les risques, la cause, les travaux et le résultat.')}</p><label>${t('Date','Date')} <select id="report-date"><option value="all">${t('All dates','Toutes les dates')}</option>${dates.map(date=>`<option value="${esc(date)}" ${reportDate===date?'selected':''}>${esc(date)}</option>`).join('')}</select></label></div>${groups.map(date=>`<section class="report-day"><div class="report-day-head"><h2>${esc(date==='unknown'?t('Date unavailable','Date indisponible'):date)}</h2><span>${shown.filter(item=>(item.date || 'unknown')===date).length} ${t('interventions','interventions')}</span></div><div class="intervention-report-grid">${shown.filter(item=>(item.date || 'unknown')===date).map(interventionCard).join('')}</div></section>`).join('') || empty()}`;
   }
   return roleView();
 }
@@ -113,7 +120,8 @@ function recordView() {
   }
   if(collection==='reports') {
     if(r.status==='Draft') actions+=button(t('Approve report','Approuver le rapport'),'approve-report',id,allowed('approve'),true);
-    body=`<div class="detail-grid">${info(t('Date / shift','Date / poste'),`${r.date} / ${label(r.shift)}`)}${info(t('Author','Auteur'),r.author)}</div><h3>${t('Shift observations','Observations du poste')}</h3><p class="prose">${esc(r.summary || '—')}</p><div class="detail-grid">${info(t('Diagnosis','Diagnostic'),r.diagnosis)}${info(t('Risks','Risques'),r.risks)}${info(t('Root cause','Cause racine'),r.rootCause)}${info(t('Result','Résultat'),r.result)}</div><h3>${t('Handover','Consignes')}</h3><p class="prose">${esc(r.handover || '—')}</p><h3>${t('Automatically linked daily activity','Activité du jour liée automatiquement')}</h3><p class="legend">${t('Requests and work orders for this date update here automatically. Confirm their shift in your notes.','Les demandes et OT de cette date se mettent à jour ici automatiquement. Précisez leur poste dans vos notes.')}</p>${flow.reportActivities(db,r.date).map(reportActivity).join('') || empty()}`;
+    const related=flow.interventionReports(db).filter(item=>item.date===r.date);
+    body=`<div class="detail-grid">${info(t('Date / shift','Date / poste'),`${r.date} / ${label(r.shift)}`)}${info(t('Author','Auteur'),r.author)}</div><h3>${t('Shift observations','Observations du poste')}</h3><p class="prose">${esc(r.summary || '—')}</p><div class="detail-grid">${info(t('Diagnosis','Diagnostic'),r.diagnosis)}${info(t('Risks','Risques'),r.risks)}${info(t('Root cause','Cause racine'),r.rootCause)}${info(t('Result','Résultat'),r.result)}</div><h3>${t('Handover','Consignes')}</h3><p class="prose">${esc(r.handover || '—')}</p><h3>${t('Interventions on this date','Interventions de cette date')}</h3><p class="legend">${t('Each intervention has its own report. Open it to see the full details.','Chaque intervention a sa propre fiche. Ouvrez-la pour voir le détail.')}</p>${related.map(linkedIntervention).join('') || empty()}`;
   }
   return `${button(t('Back to list','Retour à la liste'),'back')}${heading(esc(r.title || r.id),esc(r.equipmentId?path(r.equipmentId):r.date))}<section class="panel record-panel"><div class="panel-head"><strong>${esc(r.id)}</strong>${badge(r.status)}</div><div class="record-actions">${actions}${button(t('Print / sign','Imprimer / signer'),'print',id)}</div>${body}${history(r)}</section>`;
 }
@@ -170,7 +178,8 @@ function printRecord() {
   area.querySelectorAll('.print-record button,.history').forEach(el=>el.remove()); area.classList.add('print-preview'); const sheet=area.querySelector('.print-sheet'); sheet.style.setProperty('--print-scale',Math.min(1,950/sheet.scrollHeight)); area.querySelector('button').focus();
 }
 document.addEventListener('click',async e=>{
-  const nav=e.target.closest('[data-page]'); if(nav && !busy) { page=nav.dataset.page; detail=null; dialog=null; query=''; viewFilter='All'; render(); return; }
+  const nav=e.target.closest('[data-page]'); if(nav && !busy) { page=nav.dataset.page; detail=null; dialog=null; query=''; viewFilter='All'; if(page==='Reports') reportTab='interventions'; render(); return; }
+  const tab=e.target.closest('[data-report-tab]'); if(tab && !busy) { reportTab=tab.dataset.reportTab; viewFilter='All'; render(); return; }
   const filter=e.target.closest('[data-filter]'); if(filter && !busy) { viewFilter=filter.dataset.filter; render(); return; }
   const target=e.target.closest('[data-action]'); if(!target || busy) return;
   const {action,id}=target.dataset;
@@ -179,6 +188,7 @@ document.addEventListener('click',async e=>{
   if(action==='cancel') { dialog=null; pendingPhotos=[]; render(); return; }
   if(action==='back') { detail=null; render(); return; }
   if(action==='open') { detail=id.split(':'); const destination=({requests:'Requests',workOrders:'Work',partRequests:'Parts',reports:'Reports'})[detail[0]]; if(destination!==page) { page=destination; viewFilter='All'; query=''; } render(); return; }
+  if(action==='open-report-intervention') { detail=id.split(':'); render(); return; }
   if(action==='print') { printRecord(); return; }
   if(action==='print-now') { window.print(); return; }
   if(action==='close-print') { document.querySelector('#print-area').classList.remove('print-preview'); document.querySelector('[data-action="print"]')?.focus(); return; }
@@ -195,6 +205,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',async e=>{
   const el=e.target;
+  if(el.id==='report-date') { reportDate=el.value; render(); return; }
   if(el.id==='photos') {
     const currentDialog=dialog; busy=true; const submit=document.querySelector('#entry [type=submit]'); submit.disabled=true;
     try { if(pendingPhotos.length+el.files.length>4) throw new Error(t('Up to 4 photos per request.','Maximum 4 photos par demande.')); const images=await readPhotos([...el.files]); if(dialog===currentDialog) { pendingPhotos.push(...images); document.querySelector('#photo-preview').innerHTML=photoPreview(); document.querySelector('#photo-error').textContent=''; } }
