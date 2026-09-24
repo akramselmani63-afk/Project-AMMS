@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seed, load, equipmentPath } from './data.js';
+import { seed, load, equipmentPath, sortedEquipment } from './data.js';
 test('source-backed names keep provenance and unverified operating state',()=>{
   const db=seed(),machine=db.equipment.find(e=>e.id==='EQ-140');
   assert.match(machine.source,/Rapport de Permanence AGRIDIAM/);
@@ -19,3 +19,11 @@ test('old data gains sourced assets without losing custom assets or requests',()
 test('corrupted saved data is reported instead of silently replaced by a demo',()=>{
   assert.throws(()=>load({getItem:()=>'{broken'}),/not been overwritten/);
 });
+test('new equipment sorts beside its siblings in hierarchy order',()=>{
+  const db=seed();
+  db.equipment.push({id:'EQ-999',name:'Micro B203',parentId:'EQ-105'});
+  const ordered=sortedEquipment(db.equipment).map(item=>item.id);
+  assert.deepEqual(ordered.slice(ordered.indexOf('EQ-106'),ordered.indexOf('EQ-999')+1),['EQ-106','EQ-107','EQ-999']);
+  assert.ok(ordered.indexOf('EQ-105')<ordered.indexOf('EQ-106'));
+});
+
