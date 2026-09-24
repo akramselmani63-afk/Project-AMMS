@@ -76,4 +76,20 @@ export function equipmentPath(items, id) {
   while (current && !seen.has(current.id)) { path.unshift(current.name); seen.add(current.id); current = items.find(x => x.id === current.parentId); }
   return path.join(' / ') || 'Unassigned';
 }
+export function sortedEquipment(items, locale='fr') {
+  const byId=new Map(items.map(item=>[item.id,item]));
+  const collator=new Intl.Collator(locale,{numeric:true,sensitivity:'base'});
+  const names=item=>{
+    const result=[],seen=new Set(); let current=item;
+    while(current && !seen.has(current.id)) { result.unshift(current.name || ''); seen.add(current.id); current=byId.get(current.parentId); }
+    return result;
+  };
+  return [...items].sort((a,b)=>{
+    const left=names(a),right=names(b);
+    for(let i=0;i<Math.min(left.length,right.length);i++) {
+      const order=collator.compare(left[i],right[i]); if(order) return order;
+    }
+    return left.length-right.length || collator.compare(a.id,b.id);
+  });
+}
 
