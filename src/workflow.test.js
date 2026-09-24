@@ -139,6 +139,15 @@ test('shift report snapshots daily work; approval makes it final',()=>{
   db.role='Maintenance Responsible'; f.approveReport(db,r.id,{note:'Reviewed'}); assert.equal(r.status,'Approved');
   assert.throws(()=>f.approveReport(db,r.id,{note:'Again'}),/stage/);
 });
+test('one intervention report combines its request and work order',()=>{
+  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
+  const entries=f.interventionReports(db);
+  assert.equal(entries.length,db.requests.length);
+  const entry=entries.find(item=>item.requestId===w.requestId);
+  assert.equal(entry.id,w.id); assert.equal(entry.workOrderId,w.id);
+  assert.equal(entry.cause,'Wear'); assert.equal(entry.actions,'Replaced bearing');
+  assert.equal(entry.date,f.localDay(w.completedAt));
+});
 test('completion records current time by default and accepts an edited local time',()=>{
   const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
   const before=Date.now(); f.updateWork(db,w.id,'complete',completion);
