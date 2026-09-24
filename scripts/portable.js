@@ -12,7 +12,7 @@ const source = async (path, imports, names) => {
 
 const logo = `data:image/png;base64,${(await readFile(resolve(root, 'assets/agridiam-logo.png'))).toString('base64')}`;
 const assets = await source('src/source-assets.js', '', ['sourceTitle', 'sourceEquipment']);
-const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath']);
+const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath', 'sortedEquipment']);
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
   'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
   'addRequest', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
@@ -58,7 +58,7 @@ const storage = (() => {
   return {readWorkspace, writeWorkspace};
 })();`;
 
-const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {equipmentPath} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readPhotos} = photosModule;\n${app}\n})();`;
+const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readPhotos} = photosModule;\n${app}\n})();`;
 const css = (await read('styles.css')).replaceAll("./assets/agridiam-logo.png", logo);
 const startup = `const showStartupError = event => { const app = document.getElementById('app'); if (app && !app.querySelector('.shell')) { const message = event.reason?.message || event.message || 'Unknown startup error'; app.innerHTML = '<main style="font:16px Arial,sans-serif;padding:32px;max-width:700px"><h1>AMMS could not open / AMMS ne peut pas démarrer</h1><p>' + String(message).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</p></main>'; } }; window.addEventListener('error', showStartupError); window.addEventListener('unhandledrejection', showStartupError);`;
 const html = `<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="theme-color" content="#152c35">\n<title>AMMS · AGRIDIAM Maintenance Management System</title>\n<style>${css}</style>\n</head>\n<body>\n<div id="app"><main style="font:16px Arial,sans-serif;padding:32px">Opening AMMS… / Ouverture d’AMMS…</main></div>\n<script>${startup}</script>\n<script>${script.replaceAll('</script', '<\\/script')}</script>\n</body>\n</html>\n`;
