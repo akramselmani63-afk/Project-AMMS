@@ -22,6 +22,12 @@ const requireValue = (ok, message) => { if (!ok) throw new Error(message); };
 const required = (v, key) => { const text=String(v[key] || '').trim(); requireValue(text, `Required: ${key}`); return text; };
 const optional = (v,key) => String(v[key] || '').trim();
 const number = (v, minimum=0) => { const n=Number(v); requireValue(Number.isFinite(n) && n>=minimum,'Invalid quantity or duration.'); return n; };
+export function elapsedMinutes(start,finish) {
+  const startMs=new Date(start).getTime(), finishMs=new Date(finish).getTime();
+  requireValue(Number.isFinite(startMs) && Number.isFinite(finishMs),'Enter valid start and completion times.');
+  requireValue(finishMs>=startMs,'Completion cannot be before work started.');
+  return Math.round((finishMs-startMs)/60_000);
+}
 const record = (db, collection, id) => { const item=db[collection].find(x=>x.id===id); requireValue(item,'Record not found.'); return item; };
 const asset = (db,id) => requireValue(db.equipment.some(x=>x.id===id),'Select valid equipment.');
 const allow = (db,action) => requireValue(can(db.role,action),'This role cannot perform this action.');
@@ -166,11 +172,13 @@ export function updateWork(db,id,action,v={}) {
   } else if(action==='complete') {
     stage(w,'In progress'); requireValue(w.participants.includes(db.role),'Only an assigned participant can complete work.');
     requireValue(!partsPending(db,w),'Required spare parts are still awaiting acceptance.');
-    const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),downtimeMinutes:number(v.downtimeMinutes || 0),repair:required(v,'repair')};
+    const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),repair:required(v,'repair')};
     const finish=v.completedAt ? new Date(v.completedAt) : new Date();
     requireValue(!Number.isNaN(finish.getTime()),'Enter a valid completion time.');
-    if(w.startedAt) requireValue(finish >= new Date(w.startedAt),'Completion cannot be before work started.');
-    Object.assign(w,completion,{status:'Closed',completedAt:finish.toISOString()}); audit(db,w,'Work completed',w.actions);
+    const start=w.startedAt || v.startedAt;
+    requireValue(start,'Enter the start time for this older work order.');
+    const downtimeMinutes=elapsedMinutes(start,finish);
+    Object.assign(w,completion,{status:'Closed',startedAt:new Date(start).toISOString(),completedAt:finish.toISOString(),downtimeMinutes}); audit(db,w,'Work completed',w.actions);
     const request=record(db,'requests',w.requestId); request.status='Closed'; audit(db,request,'Closed with work order',w.id);
     advancePreventive(db,w);
   }
