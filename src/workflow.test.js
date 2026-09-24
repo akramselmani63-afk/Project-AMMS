@@ -10,7 +10,7 @@ function approved(db,participants=['Maintenance Engineer']) {
   db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Isolate and verify absence of energy'});
   db.role='Maintenance Engineer'; return f.createWork(db,r.id,{dueDate:f.today(),participants});
 }
-const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',downtimeMinutes:20,repair:'Permanent'};
+const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
 test('employee reports photos but cannot assess, approve, execute or purchase',()=>{
   const db=f.seed(),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
   assert.throws(()=>f.assess(db,r.id,{priority:'P1'}),/role/);
@@ -157,6 +157,17 @@ test('completion records current time by default and accepts an edited local tim
   f.updateWork(db2,w2.id,'complete',{...completion,completedAt:`${edited.getFullYear()}-${String(edited.getMonth()+1).padStart(2,'0')}-${String(edited.getDate()).padStart(2,'0')}T${String(edited.getHours()).padStart(2,'0')}:${String(edited.getMinutes()).padStart(2,'0')}`});
   assert.equal(new Date(w2.completedAt).getHours(),edited.getHours());
   assert.equal(new Date(w2.completedAt).getMinutes(),edited.getMinutes());
+});
+test('downtime is calculated from start and finish and cannot be entered manually',()=>{
+  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
+  w.startedAt='2026-09-24T08:00:00.000Z';
+  f.updateWork(db,w.id,'complete',{...completion,completedAt:'2026-09-24T09:15:00.000Z',downtimeMinutes:999});
+  assert.equal(w.downtimeMinutes,75);
+  assert.equal(f.interventionReports(db).find(item=>item.id===w.id).downtimeMinutes,75);
+  const other=f.seed(),legacy=approved(other); f.updateWork(other,legacy.id,'start');
+  legacy.startedAt=undefined;
+  assert.throws(()=>f.updateWork(other,legacy.id,'complete',completion),/start time/);
+  assert.throws(()=>f.elapsedMinutes('2026-09-24T09:15:00Z','2026-09-24T08:00:00Z'),/before work started/);
 });
 test('migration preserves custom records, legacy status, parts and documents',()=>{
   const db=f.seed(); db.schemaVersion=2; db.requests.push({id:'IR-999',title:'User text',status:'New',photos:[{name:'keep.jpg'}]});
