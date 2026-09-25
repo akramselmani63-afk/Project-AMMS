@@ -4,6 +4,18 @@ import { readWorkspace, writeWorkspace } from './storage.js';
 import { readPhotos } from './photos.js';
 
 const app=document.querySelector('#app');
+const splashStarted=performance.now();
+function finishSplash(immediate=false) {
+  const splash=document.querySelector('#splash');
+  if(!splash) return;
+  const reveal=()=>{
+    app.removeAttribute('inert');
+    splash.classList.add('is-leaving');
+    setTimeout(()=>splash.remove(),immediate?0:250);
+  };
+  if(immediate) reveal();
+  else setTimeout(reveal,Math.max(0,2750-(performance.now()-splashStarted)));
+}
 let db, page='Overview', query='', viewFilter='All', reportTab='interventions', reportDate='all', detail=null, dialog=null, pendingPhotos=[], busy=false;
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,fr)=>db?.language==='fr'?fr:en;
@@ -34,7 +46,7 @@ const info=(name,value)=>`<div><small>${name}</small><strong>${esc(value ?? '—
 const photoPreview=()=>pendingPhotos.map((photo,index)=>`<div>${photos([photo])}${button(t('Remove photo','Retirer la photo'),'remove-photo',String(index))}</div>`).join('');
 const history=item=>`<details class="history"><summary>${t('Activity & approvals','Historique et validations')} (${item.history?.length || 0})</summary>${(item.history || []).map(e=>`<div class="mini-row"><div><strong>${esc(label(e.role))} · ${esc(e.actor)}</strong><small>${esc(label(e.action))} · ${esc(displayTime(e.at))}</small><p>${esc(e.note)} ${esc(e.exception || '')}</p></div></div>`).join('')}</details>`;
 const reportOpenButton=a=>button(t('Open report','Ouvrir la fiche'),'open-report-intervention',`${a.workOrderId?'workOrders':'requests'}:${a.id}`);
-const mobileNav=()=>`<nav class="mobile-nav" aria-label="${t('Quick navigation','Navigation rapide')}">${['Overview','Equipment','Requests','Work'].map(key=>`<button type="button" class="mobile-nav-item ${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}><span class="mobile-nav-mark" aria-hidden="true"></span><span>${t(...labels[key])}</span></button>`).join('')}<button type="button" class="mobile-nav-item" data-action="menu"><span class="mobile-nav-mark more" aria-hidden="true">···</span><span>${t('More','Plus')}</span></button></nav>`;
+const mobileNav=()=>`<nav class="mobile-nav" aria-label="${t('Quick navigation','Navigation rapide')}">${[['Overview','Home','Accueil'],['Equipment','Equipment','Équipements'],['Requests','Requests','Demandes'],['Work','Work orders','Ordres']].map(([key,en,fr])=>`<button type="button" class="mobile-nav-item ${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}><span class="mobile-nav-mark" aria-hidden="true"></span><span>${t(en,fr)}</span></button>`).join('')}<button type="button" class="mobile-nav-item" data-action="menu"><span class="mobile-nav-mark more" aria-hidden="true">···</span><span>${t('More','Plus')}</span></button></nav>`;
 const interventionCard=a=>`<article class="intervention-report-card"><div class="intervention-card-head"><div><span class="eyebrow">${esc(a.requestId)}${a.workOrderId?` · ${esc(a.workOrderId)}`:''}</span><h3>${esc(a.title)}</h3></div>${badge(a.status)}</div><p class="intervention-card-asset">${esc(path(a.equipmentId))}</p><div class="intervention-card-facts"><span>${t('Priority','Priorité')} <strong>${esc(a.priority || '—')}</strong></span><span>${esc(displayTime(a.at))}</span></div><p class="intervention-card-description">${esc(a.description || a.diagnosis || '—')}</p><div class="intervention-card-foot"><span>${a.result?`${t('Result','Résultat')}: ${esc(a.result)}`:t('Awaiting completion','En attente de fin des travaux')}</span>${reportOpenButton(a)}</div></article>`;
 const linkedIntervention=a=>`<div class="mini-row"><div><strong>${esc(a.id)} · ${esc(a.title)}</strong><small>${esc(path(a.equipmentId))} · ${esc(label(a.status))}</small></div>${reportOpenButton(a)}</div>`;
 const openButton=(collection,id)=>button(t('Open','Ouvrir'),'open',`${collection}:${id}`);
@@ -44,7 +56,7 @@ function table(items,collection,extra=()=> '') {
 }
 function render() {
   document.documentElement.lang=db.language;
-  app.innerHTML=`<div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM" class="brand-logo"><span class="brand-subtitle">AMMS · MAINTENANCE</span></div><div class="workspace-label">${t('WORKSPACE','ESPACE DE TRAVAIL')} <span>DEMO</span></div><nav aria-label="${t('Navigation','Navigation')}">${Object.entries(labels).map(([key,v])=>`<button class="nav-item ${page===key?'active':''}" data-page="${key}">${t(...v)}</button>`).join('')}</nav><div class="sidebar-foot"><strong>${t('Local prototype','Prototype local')}</strong><p>${t('Records and photos stay in this browser. Export a backup before clearing browser data.','Les données et photos restent dans ce navigateur. Exportez une sauvegarde avant de vider le navigateur.')}</p>${button(t('Export backup','Exporter une sauvegarde'),'export')}</div></aside><main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Menu">☰</button><div class="breadcrumb">AMMS / ${t(...labels[page])}</div><div class="top-actions"><label class="search"><input id="search" type="search" aria-label="${t('Search current view','Rechercher dans cette vue')}" placeholder="${t('Search current view','Rechercher dans cette vue')}" value="${esc(query)}"></label><select id="language" aria-label="Language"><option value="fr" ${db.language==='fr'?'selected':''}>FR</option><option value="en" ${db.language==='en'?'selected':''}>EN</option></select><button class="role-chip" data-page="Roles">${esc(label(db.role))}</button></div></header><div class="content"><div class="demo-banner"><strong>DEMO</strong> · ${t('Equipment names are sourced from AGRIDIAM reports. Workflows and operational records are a local prototype; role switching is not authentication.','Les noms des équipements proviennent des rapports AGRIDIAM. Les opérations sont un prototype local ; le changement de rôle ne constitue pas une authentification.')}</div>${detail?recordView():view()}</div></main>${mobileNav()}${dialog?modal():''}</div><section id="print-area"></section>`;
+  app.innerHTML=`<div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img src="./assets/amms-logo-monitoring.png" alt="AMMS · AGRIDIAM Maintenance Monitoring System" class="brand-logo"></div><div class="workspace-label">${t('WORKSPACE','ESPACE DE TRAVAIL')} <span>DEMO</span></div><nav aria-label="${t('Navigation','Navigation')}">${Object.entries(labels).map(([key,v])=>`<button class="nav-item ${page===key?'active':''}" data-page="${key}">${t(...v)}</button>`).join('')}</nav><div class="sidebar-foot"><strong>${t('Local prototype','Prototype local')}</strong><p>${t('Records and photos stay in this browser. Export a backup before clearing browser data.','Les données et photos restent dans ce navigateur. Exportez une sauvegarde avant de vider le navigateur.')}</p>${button(t('Export backup','Exporter une sauvegarde'),'export')}</div></aside><main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Menu">☰</button><div class="breadcrumb">AMMS / ${t(...labels[page])}</div><div class="top-actions"><label class="search"><input id="search" type="search" aria-label="${t('Search current view','Rechercher dans cette vue')}" placeholder="${t('Search current view','Rechercher dans cette vue')}" value="${esc(query)}"></label><select id="language" aria-label="Language"><option value="fr" ${db.language==='fr'?'selected':''}>FR</option><option value="en" ${db.language==='en'?'selected':''}>EN</option></select><button class="role-chip" data-page="Roles">${esc(label(db.role))}</button></div></header><div class="content"><div class="demo-banner"><strong>DEMO</strong> · ${t('Equipment names are sourced from AGRIDIAM reports. Workflows and operational records are a local prototype; role switching is not authentication.','Les noms des équipements proviennent des rapports AGRIDIAM. Les opérations sont un prototype local ; le changement de rôle ne constitue pas une authentification.')}</div>${detail?recordView():view()}</div></main>${mobileNav()}${dialog?modal():''}</div><section id="print-area"></section>`;
   if(dialog) { document.querySelector('.modal input:not([type=hidden]),.modal textarea,.modal select')?.focus(); document.querySelector('#photo-preview')?.insertAdjacentHTML('beforeend',photoPreview()); }
 }
 function view() {
@@ -194,9 +206,9 @@ document.addEventListener('click',async e=>{
   if(action==='open') { detail=id.split(':'); const destination=({requests:'Requests',workOrders:'Work',partRequests:'Parts',reports:'Reports'})[detail[0]]; if(destination!==page) { page=destination; viewFilter='All'; query=''; } render(); return; }
   if(action==='open-report-intervention') { detail=id.split(':'); render(); return; }
   if(action==='print') { printRecord(); return; }
-  if(action==='print-now') { if(window.AMMSNative) window.AMMSNative.printPage(); else window.print(); return; }
+  if(action==='print-now') { window.print(); return; }
   if(action==='close-print') { document.querySelector('#print-area').classList.remove('print-preview'); document.querySelector('[data-action="print"]')?.focus(); return; }
-  if(action==='export') { const json=JSON.stringify(db,null,2); if(window.AMMSNative) { window.AMMSNative.saveBackup(json); return; } const url=URL.createObjectURL(new Blob([json],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download=`AMMS-backup-${flow.today()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }
+  if(action==='export') { const url=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download=`AMMS-backup-${flow.today()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }
   try {
     if(action==='start-work' || action==='generate-pm') {
       busy=true; await mutate(next=>action==='start-work'?flow.updateWork(next,id,'start'):flow.generatePM(next,id)); render(); flash(t('Saved in this browser.','Enregistré dans ce navigateur.')); return;
@@ -253,5 +265,5 @@ document.addEventListener('submit',async e=>{
   } catch(err) { document.querySelector('#form-error').textContent=err.message; submit.disabled=false; }
   finally { busy=false; }
 });
-try { db=await readWorkspace(); render(); } catch(err) { app.innerHTML=`<main class="content"><h1>AMMS</h1><p>${esc(err.message)}</p><p>Saved data has not been overwritten. / Les données enregistrées n’ont pas été écrasées.</p></main>`; }
+try { db=await readWorkspace(); render(); finishSplash(); } catch(err) { app.innerHTML=`<main class="content"><h1>AMMS</h1><p>${esc(err.message)}</p><p>Saved data has not been overwritten. / Les données enregistrées n’ont pas été écrasées.</p></main>`; finishSplash(true); }
 
