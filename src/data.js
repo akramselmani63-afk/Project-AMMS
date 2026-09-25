@@ -1,16 +1,8 @@
 import { sourceEquipment } from './source-assets.js';
 
 export const STORAGE_KEY = 'amms-demo-v1';
-export const roles = ['Requester', 'Technician', 'Planner', 'Supervisor', 'Admin'];
-export const permissions = {
-  Requester: ['request:create'],
-  Technician: ['request:create', 'work:update', 'report:create'],
-  Planner: ['request:create', 'request:triage', 'work:create', 'work:update', 'preventive:manage', 'parts:manage', 'document:manage', 'equipment:manage', 'report:create'],
-  Supervisor: ['request:create', 'request:triage', 'work:create', 'work:update', 'preventive:manage', 'parts:manage', 'document:manage', 'equipment:manage', 'report:create'],
-  Admin: ['request:create', 'request:triage', 'work:create', 'work:update', 'preventive:manage', 'parts:manage', 'document:manage', 'equipment:manage', 'report:create']
-};
-export const can = (role, action) => permissions[role]?.includes(action) ?? false;
-const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Purchasing Department', 'Developer Admin'];
+const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export function seed() {
   return {
@@ -53,7 +45,7 @@ export function load(storage = globalThis.localStorage) {
     const data = JSON.parse(raw);
     const base = seed();
     for (const key of ['equipment', 'requests', 'workOrders', 'preventive', 'reports', 'parts', 'documents']) if (!Array.isArray(data[key])) data[key] = base[key];
-    if (data.schemaVersion !== 2) {
+    if (!data.schemaVersion || data.schemaVersion < 2) {
       const originalTitles = {
         requests: { 'IR-001': 'Intermittent bag feed stop', 'IR-002': 'Air pressure fluctuation', 'IR-003': 'Conveyor guide adjustment' },
         workOrders: { 'WO-001': 'Inspect bag feed sensor', 'WO-002': 'Inspect sewing head' },
@@ -72,10 +64,10 @@ export function load(storage = globalThis.localStorage) {
     const existing = new Set(data.equipment.map(x => x.id));
     data.equipment = [...sourceEquipment.filter(x => !existing.has(x.id)).map(x => ({...x})), ...data.equipment];
     for (const item of data.equipment) if (!item.source) item.source = 'Demo record';
-    if (!roles.includes(data.role)) data.role = base.role;
+    if (!roles.includes(data.role)) data.role = ({Requester:'Employee',Technician:'Maintenance Engineer',Planner:'Maintenance Engineer',Supervisor:'Maintenance Responsible','Service Achats':'Purchasing Department',Admin:'Developer Admin'})[data.role] || 'Maintenance Engineer';
     if (!['en', 'fr'].includes(data.language)) data.language = 'fr';
     return data;
-  } catch { return seed(); }
+  } catch { throw new Error('Saved data could not be read. It has not been overwritten.'); }
 }
 export function save(data, storage = globalThis.localStorage) { storage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 export function nextId(items, prefix) { return `${prefix}-${String(Math.max(0, ...items.map(x => Number(x.id.split('-').at(-1)) || 0)) + 1).padStart(3, '0')}`; }
@@ -84,22 +76,20 @@ export function equipmentPath(items, id) {
   while (current && !seen.has(current.id)) { path.unshift(current.name); seen.add(current.id); current = items.find(x => x.id === current.parentId); }
   return path.join(' / ') || 'Unassigned';
 }
-export function addRequest(data, value) {
-  if (!value.title?.trim() || !data.equipment.some(x => x.id === value.equipmentId)) throw new Error('A title and valid equipment are required.');
-  const item = { id: nextId(data.requests, 'IR'), title: value.title.trim(), equipmentId: value.equipmentId, severity: value.severity || 'S2', priority: value.priority || 'P3', status: 'New', reportedBy: value.reportedBy?.trim() || 'Demo user', createdAt: day(), description: value.description?.trim() || '' };
-  data.requests.unshift(item); return item;
+export function sortedEquipment(items, locale='fr') {
+  const byId=new Map(items.map(item=>[item.id,item]));
+  const collator=new Intl.Collator(locale,{numeric:true,sensitivity:'base'});
+  const names=item=>{
+    const result=[],seen=new Set(); let current=item;
+    while(current && !seen.has(current.id)) { result.unshift(current.name || ''); seen.add(current.id); current=byId.get(current.parentId); }
+    return result;
+  };
+  return [...items].sort((a,b)=>{
+    const left=names(a),right=names(b);
+    for(let i=0;i<Math.min(left.length,right.length);i++) {
+      const order=collator.compare(left[i],right[i]); if(order) return order;
+    }
+    return left.length-right.length || collator.compare(a.id,b.id);
+  });
 }
-export function createWorkOrder(data, value) {
-  if (!value.title?.trim() || !data.equipment.some(x => x.id === value.equipmentId)) throw new Error('A title and valid equipment are required.');
-  const item = { id: nextId(data.workOrders, 'WO'), title: value.title.trim(), equipmentId: value.equipmentId, requestId: value.requestId || null, type: value.type || 'Corrective', priority: value.priority || 'P3', status: 'Planned', assignee: value.assignee?.trim() || 'Unassigned', dueDate: value.dueDate || day(1), notes: value.notes?.trim() || '' };
-  data.workOrders.unshift(item);
-  const request = data.requests.find(x => x.id === item.requestId); if (request) request.status = 'Approved';
-  return item;
-}
-export function completePreventive(data, id) {
-  const plan = data.preventive.find(x => x.id === id); if (!plan) throw new Error('Plan not found.');
-  const completedOn = day(); const d = new Date(`${completedOn}T12:00:00`); d.setDate(d.getDate() + Number(plan.intervalDays));
-  plan.nextDue = d.toISOString().slice(0, 10);
-  data.reports.unshift({ id: nextId(data.reports, 'SR'), date: completedOn, shift: 'Day', author: 'Demo user', summary: `Completed preventive task: ${plan.title}.`, downtimeMinutes: 0, linkedWorkOrderId: null });
-  return plan;
-}
+

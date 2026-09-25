@@ -1,176 +1,268 @@
-import { load, save, seed, roles, can, nextId, equipmentPath, addRequest, createWorkOrder, completePreventive } from './data.js';
-import { localize, localizeMessage } from './i18n.js';
+import * as flow from './workflow.js';
+import { equipmentPath, sortedEquipment } from './data.js';
+import { readWorkspace, writeWorkspace } from './storage.js';
+import { readPhotos } from './photos.js';
 
-let db = load();
-let page = 'Overview';
-let query = '';
-let filter = 'All';
-let selectedEquipment = null;
-let dialog = '';
-let notice = '';
-const app = document.querySelector('#app');
-const nav = [
-  ['Overview', 'Overview'], ['Equipment', 'Equipment'], ['Requests', 'Intervention requests'], ['Work orders', 'Work orders'],
-  ['Preventive', 'Preventive maintenance'], ['Reports', 'Shift reports'], ['Parts', 'Spare parts'], ['Documents', 'Documents'], ['Roles', 'Roles & access']
-];
-const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const attr = esc;
-const equipmentName = id => db.equipment.find(x => x.id === id)?.name || 'Unassigned';
-const badge = (text, tone) => `<span class="badge ${tone || toneFor(text)}">${esc(text)}</span>`;
-const toneFor = text => ({ P1:'red', P2:'amber', P3:'blue', P4:'slate', S1:'slate', S2:'blue', S3:'amber', S4:'red', New:'blue', Approved:'green', Planned:'slate', 'In progress':'amber', Completed:'green', Operational:'green', Attention:'amber', Low:'red' })[text] || 'slate';
-const eqOptions = (selected = '') => db.equipment.filter(x => !['Area'].includes(x.kind)).map(x => `<option value="${x.id}" ${x.id === selected ? 'selected' : ''}>${esc(equipmentPath(db.equipment, x.id))}</option>`).join('');
-const empty = (message = 'No records match this view.') => `<div class="empty"><strong>Nothing to show</strong><p>${esc(message)}</p></div>`;
-const matches = (...values) => !query || values.some(x => String(x ?? '').toLowerCase().includes(query));
-const header = (title, description, action = '') => `<div class="section-head"><div><p class="eyebrow">Maintenance workspace</p><h1>${title}</h1><p class="lede">${description}</p></div>${action}</div>`;
-const btn = (label, action, enabled = true, extra = '') => enabled ? `<button class="button ${extra}" data-action="${action}">${label}</button>` : '';
-const stat = (value, label, detail, tone = '') => `<div class="stat"><strong class="stat-number ${tone}">${value}</strong><span>${label}</span><small>${detail}</small></div>`;
-const rows = (heads, body) => `<div class="table-wrap"><table><thead><tr>${heads.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
-const today = () => new Date().toISOString().slice(0,10);
-
-function render() {
-  const active = db.workOrders.filter(x => x.status !== 'Completed').length;
-  app.innerHTML = `<div class="shell">
-    <aside class="sidebar" id="sidebar"><div class="brand"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM" class="brand-logo"><span class="brand-subtitle">AMMS · MAINTENANCE</span></div>
-      <div class="workspace-label">WORKSPACE <span>DEMO</span></div>
-      <nav aria-label="Main navigation">${nav.map(([id,label]) => `<button class="nav-item ${page === id ? 'active' : ''}" data-page="${id}"><span class="nav-mark"></span>${label}${id === 'Work orders' ? `<em>${active}</em>` : ''}</button>`).join('')}</nav>
-      <div class="sidebar-foot"><strong>Prototype workspace</strong><p>Machine names come from the permanence reports. Incidents, stock, status and schedules remain demo data.</p></div>
-    </aside>
-    <main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Toggle menu">☰</button><div class="breadcrumb">AMMS <span>/</span> ${esc(page)}</div><div class="top-actions"><label class="search"><span>Search</span><input id="global-search" type="search" placeholder="Search current view" value="${attr(query)}" aria-label="Search current view"></label><label class="language-switch"><span class="sr-only">Language</span><select id="language-select" aria-label="Language"><option value="fr" ${db.language === 'fr' ? 'selected' : ''}>FR</option><option value="en" ${db.language === 'en' ? 'selected' : ''}>EN</option></select></label><span class="role-chip">${esc(db.role)}</span></div></header>
-    <div class="content"><div class="demo-banner"><span>DEMO DATA</span> The equipment catalogue is based on the AGRIDIAM permanence reports. Incidents, statuses, stock and schedules are illustrative.</div>${view()}</div></main>
-    ${dialog ? modal() : ''}
-  </div>`;
-  localize(app, db.language);
-  if (dialog) document.querySelector('.modal input:not([type=hidden]), .modal select, .modal textarea')?.focus();
+const app=document.querySelector('#app');
+const splashStarted=performance.now();
+function finishSplash(immediate=false) {
+  const splash=document.querySelector('#splash');
+  if(!splash) return;
+  const reveal=()=>{
+    app.removeAttribute('inert');
+    splash.classList.add('is-leaving');
+    setTimeout(()=>splash.remove(),immediate?0:250);
+  };
+  if(immediate) reveal();
+  else setTimeout(reveal,Math.max(0,2750-(performance.now()-splashStarted)));
 }
-
+let db, page='Overview', query='', viewFilter='All', reportTab='interventions', reportDate='all', detail=null, dialog=null, pendingPhotos=[], busy=false;
+const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const t=(en,fr)=>db?.language==='fr'?fr:en;
+const localInputTime=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+const displayTime=value=>{ if(!value) return '—'; if(/^\d{4}-\d{2}-\d{2}$/.test(value)) return value; const d=new Date(value); return Number.isNaN(d.getTime())?String(value):d.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{dateStyle:'short',timeStyle:'short'}); };
+const labels={Overview:['Overview','Vue d’ensemble'],Equipment:['Equipment','Équipements'],Requests:['Intervention requests','Demandes d’intervention'],Work:['Work orders','Ordres de travail'],Preventive:['Preventive maintenance','Maintenance préventive'],Parts:['Spare-parts requests','Demandes de pièces'],Reports:['Shift reports','Rapports de permanence'],Roles:['Roles & access','Rôles et accès']};
+const words={Employee:'Employé','Maintenance Engineer':'Ingénieur maintenance','Maintenance Responsible':'Responsable maintenance',HSE:'HSE','Purchasing Department':'Service achats','Service Achats':'Service achats','Developer Admin':'Admin développement',Submitted:'Nouvelle',Returned:'À corriger',Rejected:'Refusée',Closed:'Clôturée',Approved:'Approuvée','Site risk assessment':'Évaluation des risques sur site','Responsible review':'Validation responsable','HSE review':'Validation HSE','Awaiting risk assessment':'En attente de l’évaluation des risques','Awaiting approval':'En attente d’autorisation',Planned:'Planifié','In progress':'En cours','Waiting for parts':'En attente de pièces','HSE closure':'Clôture HSE',Validation:'Validation finale','Legacy completed':'Terminée (ancienne version)',Purchasing:'En traitement achats',Ordered:'Commandée','Technical acceptance':'Réception technique','Partial acceptance':'Réception partielle',Accepted:'Acceptée',Draft:'Brouillon',Day:'Jour',Night:'Nuit',Corrective:'Correctif',Preventive:'Préventif',Area:'Zone',Line:'Ligne',System:'Système',Machine:'Machine',Component:'Composant',Unknown:'Non vérifié',Unassessed:'Non évaluée'};
+const label=value=>db.language==='fr'?(words[value] || value):(value==='Submitted'?'New':value);
+Object.assign(words,{All:'Toutes',New:'Nouvelles','Pending reviews':'En attente d’approbations','Approval review':'Approbations Responsable maintenance et HSE','Electrical / LOTO':'Électricité / consignation','Hot work':'Travaux à chaud',Height:'Travail en hauteur','Confined space':'Espace confiné',Lifting:'Levage',Chemicals:'Produits chimiques','Fire systems':'Systèmes incendie',Assessed:'Analyse technique','Responsible approval':'Approbation responsable','HSE approval':'Approbation HSE','Work issued':'OT émis','Site risk assessment submitted':'Évaluation des risques soumise','Submitted to HSE':'Soumis à HSE','Work planned':'Travail planifié','Work started':'Travail démarré','Work completed':'Travail terminé','Closed with work order':'Clôturée avec OT','Purchase requested':'Achat demandé','Delivery received':'Livraison reçue','Report created':'Rapport créé','Report approved':'Rapport approuvé'});
+const statusTabs=(items,states)=>`<div class="filters" role="group" aria-label="${t('Filter by status','Filtrer par état')}">${states.map(s=>`<button type="button" class="filter ${viewFilter===s?'active':''}" aria-pressed="${viewFilter===s}" data-filter="${esc(s)}">${esc(label(s))} <span>${items.filter(x=>match(x) && flow.statusMatches(x,s)).length}</span></button>`).join('')}</div>`;
+const visibleRecords=items=>items.filter(x=>match(x) && flow.statusMatches(x,viewFilter));
+const allowed=action=>flow.can(db.role,action);
+const path=id=>equipmentPath(db.equipment,id);
+const orderedEquipment=()=>sortedEquipment(db.equipment,db.language);
+const match=x=>!query || [x.id,x.title,x.name,x.reference,x.status,x.description,path(x.equipmentId)].some(v=>String(v || '').toLowerCase().includes(query));
+const badge=value=>`<span class="badge ${['Closed','Approved','Accepted'].includes(value)?'green':['Rejected','P1'].includes(value)?'red':'blue'}">${esc(label(value || '—'))}</span>`;
+const button=(text,action,id='',enabled=true,primary=false)=>enabled?`<button type="button" class="button ${primary?'primary':'secondary'}" data-action="${action}" data-id="${esc(id)}">${text}</button>`:'';
+const empty=()=>`<div class="empty">${t('No records in this view.','Aucun enregistrement dans cette vue.')}</div>`;
+const heading=(title,description,action='')=>`<div class="section-head"><div><p class="eyebrow">AGRIDIAM · AMMS</p><h1>${title}</h1><p class="lede">${description}</p></div>${action}</div>`;
+const field=(name,title,type='text',value='',required=true)=>`<label class="field"><span>${title}</span><input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?'min="0" step="1"':''}></label>`;
+const textArea=(name,title,value='',required=false)=>`<label class="field full"><span>${title}${required?'':t(' (optional)',' (facultatif)')}</span><textarea name="${name}" rows="3" ${required?'required':''}>${esc(value)}</textarea></label>`;
+const select=(name,title,values,current='')=>`<label class="field"><span>${title}</span><select name="${name}">${values.map(v=>{const [value,text]=Array.isArray(v)?v:[v,label(v)];return `<option value="${esc(value)}" ${value===current?'selected':''}>${esc(text)}</option>`;}).join('')}</select></label>`;
+const equipmentField=(current='')=>select('equipmentId',t('Equipment / zone','Équipement / zone'),orderedEquipment().map(e=>[e.id,path(e.id)]),current);
+const checks=(name,title,values,current=[])=>`<fieldset class="field full checks"><legend>${title}</legend>${values.map(([v,l])=>`<label><input type="checkbox" name="${name}" value="${esc(v)}" ${current.includes(v)?'checked':''}> ${l}</label>`).join('')}</fieldset>`;
+const photoField=()=>`<div class="field full"><label for="photos">${t('Photos (optional)','Photos (facultatives)')}</label><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>${t('Up to 4 photos, 8 MB each. Choose existing photos or take a new photo with the camera.','Jusqu’à 4 photos, 8 Mo chacune. Choisissez des photos ou prenez-en une avec l’appareil photo.')}</small><div id="photo-preview" class="photo-grid"></div><p id="photo-error" role="alert"></p></div>`;
+const photos=items=>`<div class="photo-grid">${(items || []).filter(p=>/^data:image\/(jpeg|png|webp);base64,/.test(p.data)).map(p=>`<figure><a href="${esc(p.data)}" download="${esc(p.name)}"><img src="${esc(p.data)}" alt="${esc(p.name)}"></a><figcaption>${esc(p.name)}</figcaption></figure>`).join('')}</div>`;
+const info=(name,value)=>`<div><small>${name}</small><strong>${esc(value ?? '—')}</strong></div>`;
+const photoPreview=()=>pendingPhotos.map((photo,index)=>`<div>${photos([photo])}${button(t('Remove photo','Retirer la photo'),'remove-photo',String(index))}</div>`).join('');
+const history=item=>`<details class="history"><summary>${t('Activity & approvals','Historique et validations')} (${item.history?.length || 0})</summary>${(item.history || []).map(e=>`<div class="mini-row"><div><strong>${esc(label(e.role))} · ${esc(e.actor)}</strong><small>${esc(label(e.action))} · ${esc(displayTime(e.at))}</small><p>${esc(e.note)} ${esc(e.exception || '')}</p></div></div>`).join('')}</details>`;
+const reportOpenButton=a=>button(t('Open report','Ouvrir la fiche'),'open-report-intervention',`${a.workOrderId?'workOrders':'requests'}:${a.id}`);
+const interventionCard=a=>`<article class="intervention-report-card"><div class="intervention-card-head"><div><span class="eyebrow">${esc(a.requestId)}${a.workOrderId?` · ${esc(a.workOrderId)}`:''}</span><h3>${esc(a.title)}</h3></div>${badge(a.status)}</div><p class="intervention-card-asset">${esc(path(a.equipmentId))}</p><div class="intervention-card-facts"><span>${t('Priority','Priorité')} <strong>${esc(a.priority || '—')}</strong></span><span>${esc(displayTime(a.at))}</span></div><p class="intervention-card-description">${esc(a.description || a.diagnosis || '—')}</p><div class="intervention-card-foot"><span>${a.result?`${t('Result','Résultat')}: ${esc(a.result)}`:t('Awaiting completion','En attente de fin des travaux')}</span>${reportOpenButton(a)}</div></article>`;
+const linkedIntervention=a=>`<div class="mini-row"><div><strong>${esc(a.id)} · ${esc(a.title)}</strong><small>${esc(path(a.equipmentId))} · ${esc(label(a.status))}</small></div>${reportOpenButton(a)}</div>`;
+const openButton=(collection,id)=>button(t('Open','Ouvrir'),'open',`${collection}:${id}`);
+function table(items,collection,extra=()=> '') {
+  if(!items.length) return empty();
+  return `<div class="table-wrap"><table><thead><tr><th>${t('Record','Enregistrement')}</th><th>${t('Equipment','Équipement')}</th><th>${t('Status','État')}</th><th>${t('Details','Détails')}</th><th></th></tr></thead><tbody>${items.map(x=>`<tr><td><strong>${esc(x.title || x.summary)}</strong><small>${esc(x.id)}</small></td><td>${esc(path(x.equipmentId))}</td><td>${badge(x.status)}</td><td>${extra(x)}</td><td>${openButton(collection,x.id)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function render() {
+  document.documentElement.lang=db.language;
+  app.innerHTML=`<div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img src="./assets/amms-logo-monitoring.png" alt="AMMS · AGRIDIAM Maintenance Monitoring System" class="brand-logo"></div><div class="workspace-label">${t('WORKSPACE','ESPACE DE TRAVAIL')} <span>DEMO</span></div><nav aria-label="${t('Navigation','Navigation')}">${Object.entries(labels).map(([key,v])=>`<button class="nav-item ${page===key?'active':''}" data-page="${key}">${t(...v)}</button>`).join('')}</nav><div class="sidebar-foot"><strong>${t('Local prototype','Prototype local')}</strong><p>${t('Records and photos stay in this browser. Export a backup before clearing browser data.','Les données et photos restent dans ce navigateur. Exportez une sauvegarde avant de vider le navigateur.')}</p>${button(t('Export backup','Exporter une sauvegarde'),'export')}</div></aside><main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="Menu">☰</button><div class="breadcrumb">AMMS / ${t(...labels[page])}</div><div class="top-actions"><label class="search"><input id="search" type="search" aria-label="${t('Search current view','Rechercher dans cette vue')}" placeholder="${t('Search current view','Rechercher dans cette vue')}" value="${esc(query)}"></label><select id="language" aria-label="Language"><option value="fr" ${db.language==='fr'?'selected':''}>FR</option><option value="en" ${db.language==='en'?'selected':''}>EN</option></select><button class="role-chip" data-page="Roles">${esc(label(db.role))}</button></div></header><div class="content"><div class="demo-banner"><strong>DEMO</strong> · ${t('Equipment names are sourced from AGRIDIAM reports. Workflows and operational records are a local prototype; role switching is not authentication.','Les noms des équipements proviennent des rapports AGRIDIAM. Les opérations sont un prototype local ; le changement de rôle ne constitue pas une authentification.')}</div>${detail?recordView():view()}</div></main>${dialog?modal():''}</div><section id="print-area"></section>`;
+  if(dialog) { document.querySelector('.modal input:not([type=hidden]),.modal textarea,.modal select')?.focus(); document.querySelector('#photo-preview')?.insertAdjacentHTML('beforeend',photoPreview()); }
+}
 function view() {
-  if (page === 'Overview') return overview();
-  if (page === 'Equipment') return equipment();
-  if (page === 'Requests') return requests();
-  if (page === 'Work orders') return workOrders();
-  if (page === 'Preventive') return preventive();
-  if (page === 'Reports') return reports();
-  if (page === 'Parts') return parts();
-  if (page === 'Documents') return documents();
+  if(page==='Overview') {
+    const requests=db.requests.filter(r=>r.status==='Submitted' && match(r));
+    const work=db.workOrders.filter(w=>!['Closed','Legacy completed'].includes(w.status) && match(w)).sort((a,b)=>(a.priority || 'P4').localeCompare(b.priority || 'P4') || (a.dueDate || '').localeCompare(b.dueDate || ''));
+    const parts=db.partRequests.filter(p=>!['Closed','Rejected'].includes(p.status) && match(p));
+    const end=new Date(); end.setDate(end.getDate()+7); const through=end.toLocaleDateString('en-CA');
+    const due=db.preventive.filter(p=>p.nextDue<=through && match(p)).sort((a,b)=>a.nextDue.localeCompare(b.nextDue));
+    const metrics=[[requests.length,t('New requests','Nouvelles demandes')],[work.length,t('Open work orders','Ordres de travail ouverts')],[due.length,t('PM due within 7 days','Préventif sous 7 jours')],[parts.length,t('Open parts requests','Demandes de pièces ouvertes')]];
+    const mini=(items,collection)=>items.slice(0,4).map(r=>`<div class="mini-row"><div><strong>${esc(r.title)}</strong><small>${esc(r.id)} · ${esc(path(r.equipmentId))}</small></div>${badge(r.status)}${openButton(collection,r.id)}</div>`).join('') || empty();
+    return `${heading(t('Operational overview','Vue d’ensemble opérationnelle'),t('A clear view of today’s maintenance workload.','Une vue claire des activités de maintenance.'),button(t('New intervention','Nouvelle intervention'),'new-request','',allowed('request'),true))}
+    <div class="stats">${metrics.map(([v,l])=>`<div class="stat"><strong class="stat-number blue">${v}</strong><span>${l}</span></div>`).join('')}</div>
+    <div class="overview-grid">
+      <section class="panel wide"><div class="panel-head"><div><p class="eyebrow">${t('ACTION QUEUE','TRAVAUX À SUIVRE')}</p><h2>${t('Priority work','Travaux prioritaires')}</h2></div><button class="text-button" data-page="Work">${t('View all work orders','Tous les ordres de travail')}</button></div><div class="queue">${work.slice(0,5).map(w=>`<button class="queue-row" data-action="open" data-id="workOrders:${esc(w.id)}"><span class="queue-id">${esc(w.id)}</span><span class="queue-main"><strong>${esc(w.title)}</strong><small>${esc(path(w.equipmentId))}</small></span>${badge(w.priority)}${badge(w.status)}</button>`).join('') || empty()}</div></section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">${t('NEXT 7 DAYS','7 PROCHAINS JOURS')}</p><h2>${t('Preventive schedule','Planning préventif')}</h2></div></div>${due.slice(0,4).map(p=>`<div class="mini-row"><div><strong>${esc(p.title)}</strong><small>${esc(path(p.equipmentId))}</small></div><span>${esc(p.nextDue)}</span></div>`).join('') || empty()}<button class="text-button panel-link" data-page="Preventive">${t('Open schedule','Ouvrir le planning')}</button></section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">${t('INTAKE','SIGNALEMENTS')}</p><h2>${t('New requests','Nouvelles demandes')}</h2></div></div>${mini(requests,'requests')}<button class="text-button panel-link" data-page="Requests">${t('Review requests','Consulter les demandes')}</button></section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">${t('PURCHASING','ACHATS')}</p><h2>${t('Spare-parts purchasing','Achats de pièces')}</h2></div></div>${mini(parts,'partRequests')}<button class="text-button panel-link" data-page="Parts">${t('Open spare-parts requests','Ouvrir les demandes de pièces')}</button></section>
+    </div>`;
+  }
+  if(page==='Requests') return heading(t('Intervention requests','Demandes d’intervention'),t('Employee report → assessment → Maintenance Responsible and HSE approvals in either order.','Signalement → analyse → validations du Responsable maintenance et HSE dans l’ordre de votre choix.'),button(t('New request','Nouvelle demande'),'new-request','',allowed('request'),true))+statusTabs(db.requests,['All','New','Pending reviews','Approved','Closed','Returned','Rejected'])+table(visibleRecords(db.requests),'requests',r=>`${badge(r.priority)}<small>${r.photos?.length || 0} photo(s)</small>`);
+  if(page==='Work') return heading(t('Work orders','Ordres de travail'),t('The Maintenance Responsible issues the order. The Engineer checks site risks, then HSE approves before work starts. Completion is signed on the printed sheet.','Le Responsable maintenance émet l’OT. L’ingénieur vérifie les risques sur site, puis HSE autorise le démarrage. La clôture est signée sur la fiche imprimée.'),button(t('Issue work order','Émettre un ordre de travail'),'new-work','',db.role==='Maintenance Responsible',true))+statusTabs(db.workOrders,['All','Awaiting risk assessment','Awaiting approval','Planned','In progress','Waiting for parts','Closed'])+table(visibleRecords(db.workOrders),'workOrders',w=>`${badge(w.priority)}<small>${esc((w.participants || []).map(label).join(' + '))}</small>`);
+  if(page==='Parts') return heading(t('Spare-parts requests','Demandes de pièces de rechange'),t('Responsible approval → Purchasing Department → delivery → technical acceptance.','Validation responsable → Service achats → livraison → réception technique.'),button(t('Request spare parts','Demander des pièces'),'new-part','',allowed('parts'),true))+statusTabs(db.partRequests,['All','Responsible review','Purchasing','Ordered','Technical acceptance','Partial acceptance','Accepted','Closed','Rejected'])+table(visibleRecords(db.partRequests),'partRequests',p=>`${esc(p.reference)}<small>${p.acceptedQuantity} / ${p.quantity} ${esc(p.unit)} · ${t('accepted','acceptées')}</small>`);
+  if(page==='Equipment') return equipmentView();
+  if(page==='Preventive') return heading(t('Preventive maintenance','Maintenance préventive'),t('Generate an intervention for review; the next date advances after work closure.','Créez une intervention à valider ; la prochaine échéance avance après clôture.'),button(t('New PM plan','Nouveau plan préventif'),'new-pm','',allowed('pm'),true))+`<div class="cards-grid">${db.preventive.filter(match).map(p=>`<article class="pm-card"><p class="eyebrow">${esc(p.id)} · ${esc(p.nextDue)}</p><h2>${esc(p.title)}</h2><p>${esc(path(p.equipmentId))}</p><p>${esc(p.instructions)}</p><p>${t('Interval','Périodicité')} : ${p.intervalDays} ${t('days','jours')}</p>${button(t('Generate intervention','Créer une intervention'),'generate-pm',p.id,allowed('pm'))}</article>`).join('')}</div>`;
+  if(page==='Reports') {
+    const interventions=flow.interventionReports(db);
+    const tabs=`<div class="report-tabs" role="group" aria-label="${t('Report type','Type de rapport')}"><button type="button" data-report-tab="interventions" aria-pressed="${reportTab==='interventions'}" class="${reportTab==='interventions'?'active':''}">${t('Intervention reports','Rapports d’intervention')} <span>${interventions.length}</span></button><button type="button" data-report-tab="shift" aria-pressed="${reportTab==='shift'}" class="${reportTab==='shift'?'active':''}">${t('Shift reports','Rapports de permanence')} <span>${db.reports.length}</span></button></div>`;
+    if(reportTab==='shift') return heading(t('Reports','Rapports'),t('Write a shift report with observations and handover notes.','Rédigez un rapport de poste avec observations et consignes.'),button(t('New shift report','Nouveau rapport'),'new-report','',allowed('report'),true))+tabs+statusTabs(db.reports,['All','Draft','Approved'])+`<div class="report-list">${visibleRecords(db.reports).map(r=>`<article class="report"><div class="report-date"><strong>${esc(r.date)}</strong><span>${esc(label(r.shift))}</span>${badge(r.status)}</div><div><h2>${esc(r.summary || r.id)}</h2><p>${esc(r.equipmentId?path(r.equipmentId):t('All equipment','Tous les équipements'))} · ${esc(r.author)}</p>${openButton('reports',r.id)}</div></article>`).join('') || empty()}</div>`;
+    const dates=[...new Set(interventions.map(item=>item.date || 'unknown'))];
+    const shown=interventions.filter(item=>match(item) && (reportDate==='all' || item.date===reportDate));
+    const groups=[...new Set(shown.map(item=>item.date || 'unknown'))];
+    return heading(t('Reports','Rapports'),t('One report per intervention, grouped by the latest activity date.','Un rapport par intervention, classé selon la date de la dernière activité.'),button(t('New shift report','Nouveau rapport'),'new-report','',allowed('report'),true))+tabs+`<div class="report-toolbar"><p>${t('Each card combines the request and its work order. Open it for diagnosis, risks, cause, work and result.','Chaque fiche réunit la demande et son OT. Ouvrez-la pour le diagnostic, les risques, la cause, les travaux et le résultat.')}</p><label>${t('Date','Date')} <select id="report-date"><option value="all">${t('All dates','Toutes les dates')}</option>${dates.map(date=>`<option value="${esc(date)}" ${reportDate===date?'selected':''}>${esc(date)}</option>`).join('')}</select></label></div>${groups.map(date=>`<section class="report-day"><div class="report-day-head"><h2>${esc(date==='unknown'?t('Date unavailable','Date indisponible'):date)}</h2><span>${shown.filter(item=>(item.date || 'unknown')===date).length} ${t('interventions','interventions')}</span></div><div class="intervention-report-grid">${shown.filter(item=>(item.date || 'unknown')===date).map(interventionCard).join('')}</div></section>`).join('') || empty()}`;
+  }
   return roleView();
 }
-
-function overview() {
-  const open = db.requests.filter(x => x.status === 'New');
-  const active = db.workOrders.filter(x => x.status !== 'Completed');
-  const due = db.preventive.filter(x => x.nextDue <= new Date(Date.now() + 7*86400000).toISOString().slice(0,10));
-  const low = db.parts.filter(x => x.quantity <= x.reorderPoint);
-  return `${header('Operational overview', 'A clear view of today’s maintenance workload.', btn('New intervention request', 'new-request', can(db.role,'request:create'), 'primary'))}
-    <div class="stats">${stat(open.length,'New requests','Awaiting triage','blue')}${stat(active.length,'Open work orders','Corrective and preventive','amber')}${stat(due.length,'PM due within 7 days','Upcoming planned work','')}${stat(low.length,'Parts at reorder point','Review stock coverage','red')}</div>
-    <div class="overview-grid"><section class="panel wide"><div class="panel-head"><div><p class="eyebrow">ACTION QUEUE</p><h2>Priority work</h2></div><button class="text-button" data-page="Work orders">View all work orders →</button></div>${active.length ? `<div class="queue">${active.slice(0,5).map(x => `<button class="queue-row" data-page="Work orders"><span class="queue-id">${x.id}</span><span class="queue-main"><strong>${esc(x.title)}</strong><small>${esc(equipmentPath(db.equipment,x.equipmentId))}</small></span>${badge(x.priority)}${badge(x.status)}</button>`).join('')}</div>` : empty('No open work orders.')}</section>
-    <section class="panel"><div class="panel-head"><div><p class="eyebrow">NEXT 7 DAYS</p><h2>Preventive schedule</h2></div></div>${due.length ? due.map(x => `<div class="mini-row"><div><strong>${esc(x.title)}</strong><small>${esc(equipmentName(x.equipmentId))}</small></div><span>${esc(x.nextDue)}</span></div>`).join('') : empty('No preventive tasks due soon.')}<button class="text-button panel-link" data-page="Preventive">Open schedule →</button></section>
-    <section class="panel"><div class="panel-head"><div><p class="eyebrow">INTAKE</p><h2>New requests</h2></div></div>${open.length ? open.slice(0,4).map(x => `<div class="mini-row"><div><strong>${esc(x.title)}</strong><small>${esc(equipmentName(x.equipmentId))}</small></div>${badge(x.severity)}</div>`).join('') : empty('No new requests.')}<button class="text-button panel-link" data-page="Requests">Review requests →</button></section>
-    <section class="panel"><div class="panel-head"><div><p class="eyebrow">STORES</p><h2>Stock attention</h2></div></div>${low.length ? low.map(x => `<div class="mini-row"><div><strong>${esc(x.name)}</strong><small>${esc(x.sku)}</small></div><span class="stock-low">${x.quantity} ${esc(x.unit)}</span></div>`).join('') : empty('All sample parts are above reorder point.')}<button class="text-button panel-link" data-page="Parts">Open spare parts →</button></section></div>`;
+function equipmentView() {
+  const ordered=orderedEquipment();
+  const visible=new Set();
+  for(const e of db.equipment.filter(match)) {
+    let current=e; const seen=new Set();
+    while(current && !seen.has(current.id)) { visible.add(current.id); seen.add(current.id); current=db.equipment.find(p=>p.id===current.parentId); }
+  }
+  const tree=(parent,seen=new Set())=>ordered.filter(e=>(e.parentId || null)===parent && visible.has(e.id) && !seen.has(e.id)).map(e=>{
+    const nextSeen=new Set([...seen,e.id]);
+    const children=tree(e.id,nextSeen);
+    return `<details class="equipment-node" ${query || parent===null?'open':''}><summary><strong>${esc(e.name)}</strong><span>${esc(e.id)} · ${esc(label(e.kind))}</span></summary><div class="equipment-node-body"><div class="detail-grid">${info(t('Operating state','État de fonctionnement'),label(e.status))}${info(t('Criticality','Criticité'),label(e.criticality))}</div>${e.description?`<p>${esc(e.description)}</p>`:''}<p class="source-note">${esc(e.source)} ${esc(e.sourceCell)}</p>${db.documents.filter(d=>d.equipmentId===e.id).map(d=>`<p>${esc(d.title)} · ${esc(d.note)}</p>`).join('')}${db.workOrders.filter(w=>w.equipmentId===e.id).map(w=>`<div class="mini-row"><strong>${esc(w.id)} · ${esc(w.title)}</strong>${badge(w.status)}${openButton('workOrders',w.id)}</div>`).join('')}${children?`<div class="equipment-children">${children}</div>`:''}</div></details>`;
+  }).join('');
+  return heading(t('Equipment register','Référentiel des équipements'),t('Expand a zone or machine to see its details and related work in the same hierarchy.','Dépliez une zone ou une machine pour consulter ses détails et travaux dans la même arborescence.'),button(t('Add equipment','Ajouter un équipement'),'new-equipment','',allowed('equipment'),true))+`<section class="panel equipment-register">${tree(null) || empty()}</section>`;
 }
-
-function equipment() {
-  const parents = db.equipment.filter(x => x.parentId === null);
-  const matching = db.equipment.filter(x => matches(x.id,x.name,x.kind,x.source));
-  const visible = new Set();
-  for (const x of matching) { let current=x; const seen=new Set(); while(current && !seen.has(current.id)) { visible.add(current.id); seen.add(current.id); current=db.equipment.find(parent=>parent.id===current.parentId); } }
-  const selected = db.equipment.find(x => x.id === selectedEquipment && visible.has(x.id)) || (query ? matching[0] : parents[0]);
-  const tree = (parentId, depth = 0) => db.equipment.filter(x => x.parentId === parentId && visible.has(x.id)).map(x => `<div class="tree-node" style="--depth:${depth}"><button data-select-equipment="${x.id}" class="tree-button ${selected?.id === x.id ? 'selected' : ''}"><span class="tree-glyph">${x.kind === 'Area' ? '▣' : x.kind === 'Line' ? '▤' : '◇'}</span><span>${esc(x.name)}</span>${x.source === 'Demo record' ? '<span class="demo-tag">DEMO</span>' : ''}<small>${esc(x.kind)}</small></button>${tree(x.id,depth+1)}</div>`).join('');
-  const related = db.workOrders.filter(x => x.equipmentId === selected?.id);
-  return `${header('Equipment register', 'Navigate areas, lines, systems and machines in one hierarchy.', btn('Add equipment','new-equipment',can(db.role,'equipment:manage'),'primary'))}<div class="equipment-layout"><section class="panel tree-panel"><div class="panel-head"><h2>Asset hierarchy</h2><small>${db.equipment.length} records</small></div><div class="tree-scroll">${matching.length ? tree(null) : empty()}</div></section><section class="panel detail-panel">${selected ? `<p class="eyebrow">${esc(selected.id)} · ${esc(selected.kind)}</p><h2>${esc(selected.name)}</h2><p class="muted">${esc(equipmentPath(db.equipment,selected.id))}</p><div class="detail-grid"><div><small>Status</small>${badge(selected.status)}</div><div><small>Criticality</small><strong>${esc(selected.criticality)}</strong></div><div><small>Parent</small><strong>${esc(equipmentName(selected.parentId))}</strong></div><div><small>Open work orders</small><strong>${related.filter(x => x.status !== 'Completed').length}</strong></div></div><h3>About this equipment</h3><p>${esc(selected.description || 'No description recorded.')}</p><div class="source-note"><strong>Source register</strong><span>${esc(selected.source || 'Demo record')}</span>${selected.sourceCell ? `<small>${esc(selected.sourceCell)}</small>` : ''}<p>Operating state and criticality are not verified.</p></div><h3>Related work</h3>${related.length ? related.map(x => `<div class="mini-row"><strong>${esc(x.id)} · ${esc(x.title)}</strong>${badge(x.status)}</div>`).join('') : empty('No linked work orders.')}` : empty('Select an asset.')}</section></div>`;
-}
-
-function requests() {
-  const items = db.requests.filter(x => (filter === 'All' || x.status === filter) && matches(x.id,x.title,equipmentName(x.equipmentId),x.reportedBy,x.description));
-  return `${header('Intervention requests','Capture a problem, assess severity, then plan the work.',btn('New request','new-request',can(db.role,'request:create'),'primary'))}<div class="legend"><strong>Severity</strong> ${db.language === 'fr' ? 'S1 faible · S2 modérée · S3 élevée · S4 critique' : 'S1 low · S2 moderate · S3 high · S4 critical'} <span></span><strong>Priority</strong> ${db.language === 'fr' ? 'P1 immédiate · P2 urgente · P3 planifiée · P4 courante' : 'P1 immediate · P2 urgent · P3 planned · P4 routine'}</div>${filters(['All','New','Approved','Closed'])}${items.length ? rows(['Request','Equipment','Severity','Priority','Status','Reported','Action'],items.map(x => `<tr><td><strong>${esc(x.id)}</strong><small>${esc(x.title)}</small></td><td>${esc(equipmentName(x.equipmentId))}</td><td>${badge(x.severity)}</td><td>${badge(x.priority)}</td><td>${badge(x.status)}</td><td>${esc(x.createdAt)}</td><td>${can(db.role,'request:triage') && x.status === 'New' ? `<button class="inline-button" data-action="triage:${x.id}">Triage</button>` : ''}${can(db.role,'work:create') && !db.workOrders.some(w => w.requestId === x.id) && x.status !== 'Closed' ? `<button class="inline-button" data-action="convert:${x.id}">Create WO</button>` : ''}</td></tr>`).join('')) : empty()}`;
-}
-function filters(values) { return `<div class="filters" role="group" aria-label="Status filter">${values.map(x => `<button class="filter ${filter === x ? 'active' : ''}" data-filter="${x}">${x}</button>`).join('')}</div>`; }
-
-function workOrders() {
-  const items = db.workOrders.filter(x => (filter === 'All' || x.status === filter || x.type === filter) && matches(x.id,x.title,equipmentName(x.equipmentId),x.assignee,x.notes));
-  return `${header('Work orders','Plan, assign and close corrective and preventive work.',btn('New work order','new-work',can(db.role,'work:create'),'primary'))}${filters(['All','Planned','In progress','Completed','Corrective','Preventive'])}${items.length ? rows(['Work order','Asset / type','Priority','Due','Owner','Status','Action'],items.map(x => `<tr><td><strong>${esc(x.id)}</strong><small>${esc(x.title)}</small></td><td>${esc(equipmentName(x.equipmentId))}<small>${esc(x.type)}</small></td><td>${badge(x.priority)}</td><td>${esc(x.dueDate)}</td><td>${esc(x.assignee)}</td><td>${badge(x.status)}</td><td>${can(db.role,'work:update') && x.status !== 'Completed' ? `<button class="inline-button" data-action="advance:${x.id}">${x.status === 'Planned' ? 'Start' : 'Complete'}</button>` : ''}</td></tr>`).join('')) : empty()}`;
-}
-
-function preventive() {
-  const items = db.preventive.filter(x => matches(x.id,x.title,equipmentName(x.equipmentId),x.owner,x.instructions));
-  return `${header('Preventive maintenance','Keep recurring inspections visible before they become urgent.',btn('New PM plan','new-pm',can(db.role,'preventive:manage'),'primary'))}<div class="cards-grid">${items.length ? items.map(x => `<article class="pm-card"><div class="card-top"><span class="eyebrow">${esc(x.id)} · EVERY ${x.intervalDays} DAYS</span>${badge(x.nextDue <= today() ? 'Due' : 'Scheduled',x.nextDue <= today() ? 'amber' : 'green')}</div><h2>${esc(x.title)}</h2><p>${esc(equipmentPath(db.equipment,x.equipmentId))}</p><div class="card-meta"><div><small>Next due</small><strong>${esc(x.nextDue)}</strong></div><div><small>Owner</small><strong>${esc(x.owner)}</strong></div></div><p class="instructions">${esc(x.instructions)}</p>${btn('Mark done','complete-pm:'+x.id,can(db.role,'preventive:manage'),'secondary')}</article>`).join('') : empty()}</div>`;
-}
-
-function reports() {
-  const items = db.reports.filter(x => matches(x.id,x.summary,x.shift,x.author,x.linkedWorkOrderId));
-  return `${header('Shift reports','Keep a concise log of maintenance activity and downtime.',btn('New shift report','new-report',can(db.role,'report:create'),'primary'))}${items.length ? `<div class="report-list">${items.map(x => `<article class="report"><div class="report-date"><strong>${esc(x.date)}</strong><span>${esc(x.shift)} shift</span></div><div><p class="eyebrow">${esc(x.id)} · ${esc(x.author)}</p><h2>${esc(x.summary)}</h2><div class="report-meta"><span>Downtime: ${x.downtimeMinutes} min</span><span>${x.linkedWorkOrderId ? 'Linked: '+esc(x.linkedWorkOrderId) : 'No linked work order'}</span></div></div></article>`).join('')}</div>` : empty()}`;
-}
-
-function parts() {
-  const items = db.parts.filter(x => matches(x.id,x.name,x.sku,x.location));
-  return `${header('Spare parts','Monitor sample stock levels and reorder thresholds.',btn('Add part','new-part',can(db.role,'parts:manage'),'primary'))}${items.length ? rows(['Part','SKU','On hand','Reorder at','Location','Action'],items.map(x => `<tr><td><strong>${esc(x.name)}</strong><small>${esc(x.id)}</small></td><td>${esc(x.sku)}</td><td>${badge(`${x.quantity} ${x.unit}`,x.quantity <= x.reorderPoint ? 'red' : 'green')}</td><td>${x.reorderPoint} ${esc(x.unit)}</td><td>${esc(x.location)}</td><td>${can(db.role,'parts:manage') ? `<button class="inline-button" data-action="adjust:${x.id}">Adjust stock</button>` : ''}</td></tr>`).join('')) : empty()}`;
-}
-
-function documents() {
-  const items = db.documents.filter(x => matches(x.id,x.title,x.category,equipmentName(x.equipmentId),x.note));
-  return `${header('Documents','Link procedures, manuals and checklists to equipment.',btn('Add document','new-document',can(db.role,'document:manage'),'primary'))}<div class="cards-grid">${items.length ? items.map(x => `<article class="document-card"><div class="doc-symbol">▤</div><p class="eyebrow">${esc(x.category)} · ${esc(x.id)}</p><h2>${esc(x.title)}</h2><p>${esc(equipmentName(x.equipmentId))}</p><small>${esc(x.note || 'No note')}</small>${x.url ? `<a href="${attr(x.url)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : '<span class="unlinked">No file linked</span>'}</article>`).join('') : empty()}</div>`;
-}
-
 function roleView() {
-  return `${header('Roles & access','Explore prototype permissions using the demo role switcher.')}<section class="panel role-panel"><h2>Current role</h2><p>Choose a role to preview which maintenance actions appear. This is a demo control, not authentication.</p><label class="field"><span>Preview role</span><select id="role-select">${roles.map(x => `<option value="${x}" ${x === db.role ? 'selected' : ''}>${x}</option>`).join('')}</select></label><div class="role-grid">${roles.map(x => `<div><h3>${x}</h3><ul>${({Requester:['Submit requests'],Technician:['Submit requests','Update work orders','Write shift reports'],Planner:['Triage requests','Plan and update work','Manage PM, parts, equipment and documents'],Supervisor:['All planning and operational actions'],Admin:['All prototype actions']})[x].map(p => `<li>${p}</li>`).join('')}</ul></div>`).join('')}</div><div class="callout"><strong>Production note</strong><p>Accounts, server-side permissions, an audit trail and shared storage must be added before real operational use.</p></div><button class="text-button" data-action="reset">Reset demo records</button></section>`;
+  const descriptions={Employee:t('Report faults, impacts and photos. Follow requests. Maintenance assigns priority.','Signaler les pannes, impacts et photos. Suivre les demandes. La maintenance définit la priorité.'),'Maintenance Engineer':t('Visit the zone, assess site risks, submit them to HSE, then execute approved work; manage equipment, preventive plans, parts requests and reports.','Visiter la zone, évaluer les risques sur site, les soumettre à HSE, puis réaliser les travaux autorisés ; gérer équipements, préventif, demandes de pièces et rapports.'),'Maintenance Responsible':t('Issue and assign work orders, approve interventions and purchases, and execute work alone or with the engineer.','Émettre et affecter les OT, approuver interventions et achats, intervenir seul ou avec l’ingénieur.'),HSE:t('Approve safety precautions after the Engineer’s site risk assessment; review safety restoration after completion.','Approuver les précautions après l’évaluation des risques sur site par l’ingénieur ; valider la remise en sécurité après intervention.'),'Purchasing Department':t('Record quotations, suppliers, orders and partial deliveries. Maintenance checks technical conformity.','Enregistrer devis, fournisseurs, commandes et livraisons partielles. La maintenance vérifie la conformité technique.'),'Developer Admin':t('Development and diagnostics only. No operational approval powers.','Développement et diagnostic uniquement. Aucun pouvoir de validation opérationnelle.')};
+  return heading(t('Roles & access','Rôles et accès'),t('Preview the actual AGRIDIAM team responsibilities.','Simuler les responsabilités réelles de l’équipe AGRIDIAM.'))+`<section class="panel"><div class="form-grid">${select('role',t('Demo role','Rôle de démonstration'),flow.roles,db.role)}${field('actor',t('Your name (recorded in activity)','Votre nom (historique)'), 'text',db.actor || '',false)}</div><p class="legend">${t('Changing roles simulates permissions on this device. Everyone can read demo records. Real account access requires a server.','Le changement de rôle simule les droits sur cet appareil. Tous peuvent consulter les données de démonstration. Les accès réels nécessitent un serveur.')}</p><div class="role-grid">${flow.roles.map(r=>`<div><h3>${esc(label(r))}</h3><p>${descriptions[r]}</p></div>`).join('')}</div><div class="callout">${t('Engineer and Maintenance Responsible can plan work. Maintenance Responsible and HSE reviews are independent for intervention requests. For a direct work order, the Engineer submits the site risk assessment before HSE review. Comments are optional.','L’ingénieur et le Responsable maintenance peuvent planifier. Les validations du Responsable maintenance et HSE sont indépendantes pour les demandes d’intervention. Pour un OT direct, l’ingénieur soumet l’évaluation des risques sur site avant la validation HSE. Les commentaires sont facultatifs.')}</div><p>${t('FR/EN changes interface labels. Original reports stay unchanged; automatic text translation is not connected.','FR/EN change les libellés de l’interface. Les rapports originaux restent inchangés ; la traduction automatique du contenu n’est pas connectée.')}</p></section>`;
 }
-
-function field(name,label,type='text',value='',required=false) { return `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${attr(value)}" ${required ? 'required' : ''}></label>`; }
-function select(name,label,options,selected='') { return `<label class="field"><span>${label}</span><select name="${name}">${options.map(x => `<option value="${attr(x)}" ${x === selected ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`; }
-function eqField(selected='') { return `<label class="field"><span>Asset</span><select name="equipmentId">${eqOptions(selected)}</select></label>`; }
-function textarea(name,label,value='') { return `<label class="field full"><span>${label}</span><textarea name="${name}" rows="3">${esc(value)}</textarea></label>`; }
+function recordView() {
+  const [collection,id]=detail; const r=db[collection].find(x=>x.id===id); if(!r) { detail=null; return view(); }
+  let actions='',body='';
+  if(collection==='requests') {
+    if(['Submitted','Returned'].includes(r.status)) actions+=button(t('Technical assessment','Analyse technique'),'assess',id,allowed('assess'),true);
+    if(flow.canReviewRequest(db.role,r)) actions+=button(t('Review decision','Décision de validation'),'review',id,true,true);
+    if((r.status==='Approved' || (db.role==='Maintenance Responsible' && ['Approval review','Responsible review','HSE review'].includes(r.status))) && !db.workOrders.some(w=>w.requestId===id)) actions+=button(t('Plan work order','Planifier un OT'),'plan-work',id,allowed('work'),true);
+    const linked=db.workOrders.find(w=>w.requestId===id); if(linked) actions+=openButton('workOrders',linked.id);
+    body=`<div class="approval-summary">${info(t('Maintenance Responsible approval','Approbation du Responsable maintenance'),r.approval?t('Approved','Approuvée'):t('Pending','En attente'))}${info(t('HSE approval','Approbation HSE'),r.hseApproval?t('Approved','Approuvée'):t('Pending','En attente'))}</div><div class="detail-grid">${info(t('Reported by','Signalé par'),r.reportedBy)}${info(t('Date','Date'),displayTime(r.createdAt))}${info(t('Priority','Priorité'),r.priority)}${info(t('Impact','Impact'),r.impact)}</div><h3>${t('Observed problem','Problème constaté')}</h3><p class="prose">${esc(r.description)}</p><h3>${t('Technical assessment','Analyse technique')}</h3><p class="prose">${esc(r.diagnosis || '—')}</p><h3>${t('Risks','Risques')}</h3><p>${esc((r.risks || []).map(label).join(', ') || t('None recorded','Aucun risque renseigné'))}</p><h3>${t('HSE precautions','Précautions HSE')}</h3><p class="prose">${esc(r.precautions || (r.hseApproval?t('Approved without comment','Approuvé sans commentaire'):t('Awaiting HSE review','En attente de validation HSE')))}</p>${photos(r.photos)}`;
+  }
+  if(collection==='workOrders') {
+    if(r.status==='Awaiting risk assessment') actions+=button(t('Assess site risks','Évaluer les risques sur site'),'site-risk',id,db.role==='Maintenance Engineer',true);
+    if(['Planned','Waiting for parts'].includes(r.status)) actions+=button(t('Start / resume','Démarrer / reprendre'),'start-work',id,allowed('work'),true);
+    if(r.status==='In progress') actions+=button(t('Record completion','Renseigner la fin des travaux'),'complete-work',id,allowed('work'),true);
+    if(['Awaiting risk assessment','Planned','In progress','Waiting for parts','Awaiting approval'].includes(r.status)) actions+=button(t('Request a part','Demander une pièce'),'new-part',id,allowed('parts'));
+    body=`<div class="detail-grid">${info(t('Participants','Intervenants'),(r.participants || []).map(label).join(' + '))}${info(t('External contractor','Prestataire extérieur'),r.external)}${info(t('Due date','Échéance'),r.dueDate)}${info(t('Downtime (min)','Arrêt (min)'),r.downtimeMinutes)}${info(t('Start','Début'),displayTime(r.startedAt))}${info(t('Completion','Fin'),displayTime(r.completedAt))}</div><p class="prose">${esc(r.notes)}</p>${r.requestId?openButton('requests',r.requestId):''}<h3>${t('Work report','Compte rendu')}</h3><div class="detail-grid">${info(t('Diagnosis','Diagnostic'),r.diagnosis)}${info(t('Cause','Cause'),r.cause)}${info(t('Actions','Actions'),r.actions)}${info(t('Final condition','État final'),r.condition)}${info(t('Repair','Réparation'),r.repair)}</div><h3>${t('Linked parts requests','Demandes de pièces liées')}</h3>${db.partRequests.filter(p=>p.workOrderId===id).map(p=>`<div class="mini-row"><strong>${esc(p.reference)} · ${esc(p.title)}</strong>${badge(p.status)}${openButton('partRequests',p.id)}</div>`).join('') || empty()}`;
+  }
+  if(collection==='partRequests') {
+    const steps={'Responsible review':['part-review','approve',t('Review request','Valider la demande')],Purchasing:['order','purchase',t('Record order','Enregistrer la commande')],Ordered:['receive','purchase',t('Record delivery','Enregistrer la livraison')],'Partial acceptance':['receive','purchase',t('Record next delivery','Enregistrer la livraison suivante')],'Technical acceptance':['accept','accept',t('Technical acceptance','Réception technique')],Accepted:['close-part','accept',t('Confirm use / handover','Confirmer utilisation / remise')]};
+    const s=steps[r.status]; if(s) actions+=button(s[2],s[0],id,allowed(s[1]),true);
+    body=`<div class="detail-grid">${info(t('Part reference','Référence de la pièce'),r.reference)}${info(t('Requested quantity','Quantité demandée'),`${r.quantity} ${r.unit}`)}${info(t('Accepted / rejected','Acceptées / refusées'),`${r.acceptedQuantity} / ${r.rejectedQuantity}`)}${info(t('Needed by','Date de besoin'),r.neededBy)}${info(t('Equivalent allowed','Équivalent autorisé'),r.equivalent?t('Yes','Oui'):t('No','Non'))}${info(t('Requested by','Demandé par'),r.requestedBy)}${info(t('Supplier','Fournisseur'),r.supplier)}${info(t('Order reference','Référence commande'),r.orderReference)}${info(t('Quotation / price','Devis / prix'),r.quote)}${info(t('Expected delivery','Livraison prévue'),r.expectedDate)}</div><p class="prose">${esc(r.description)}</p>${r.workOrderId?openButton('workOrders',r.workOrderId):''}${photos(r.photos)}<h3>${t('Deliveries','Livraisons')}</h3>${r.deliveries.map(d=>`<p>${esc(d.reference)} · ${d.quantity} ${esc(r.unit)} · ${t('accepted','acceptées')} ${d.accepted ?? '—'} · ${esc(d.note)}</p>`).join('')}`;
+  }
+  if(collection==='reports') {
+    if(r.status==='Draft') actions+=button(t('Approve report','Approuver le rapport'),'approve-report',id,allowed('approve'),true);
+    const related=flow.interventionReports(db).filter(item=>item.date===r.date && flow.inEquipmentScope(db,item.equipmentId,r.equipmentId));
+    const technical=[r.diagnosis,r.risks,r.rootCause,r.result].some(Boolean);
+    body=`<div class="detail-grid">${info(t('Date / shift','Date / poste'),`${r.date} / ${label(r.shift)}`)}${info(t('Equipment / zone','Équipement / zone'),r.equipmentId?path(r.equipmentId):t('All equipment','Tous les équipements'))}${info(t('Author','Auteur'),r.author)}</div><h3>${t('Shift observations','Observations du poste')}</h3><p class="prose">${esc(r.summary || '—')}</p>${technical?`<div class="detail-grid">${info(t('Diagnosis','Diagnostic'),r.diagnosis)}${info(t('Risks','Risques'),r.risks)}${info(t('Root cause','Cause racine'),r.rootCause)}${info(t('Result','Résultat'),r.result)}</div>`:''}<h3>${t('Handover','Consignes')}</h3><p class="prose">${esc(r.handover || '—')}</p><h3>${t('Interventions on this date','Interventions de cette date')}</h3><p class="legend">${t('Each intervention has its own report. Open it to see the full details.','Chaque intervention a sa propre fiche. Ouvrez-la pour voir le détail.')}</p>${related.map(linkedIntervention).join('') || empty()}`;
+  }
+  return `${button(t('Back to list','Retour à la liste'),'back')}${heading(esc(r.title || r.id),esc(r.equipmentId?path(r.equipmentId):r.date))}<section class="panel record-panel"><div class="panel-head"><strong>${esc(r.id)}</strong>${badge(r.status)}</div><div class="record-actions">${actions}${button(t('Print / sign','Imprimer / signer'),'print',id)}</div>${body}${history(r)}</section>`;
+}
 function modal() {
-  const [type,id] = dialog.split(':');
-  const request = db.requests.find(x => x.id === id);
-  const part = db.parts.find(x => x.id === id);
-  const forms = {
-    'new-request': ['New intervention request', `${field('title','Problem title','text','',true)}${eqField()}${select('severity','Severity',['S1','S2','S3','S4'],'S2')}${select('priority','Priority',['P1','P2','P3','P4'],'P3')}${field('reportedBy','Reported by','text','Demo user')}${textarea('description','Description')}`],
-    'new-work': ['New work order', `${field('title','Work title','text',request ? 'Investigate '+request.title : '',true)}${eqField(request?.equipmentId)}${select('type','Work type',['Corrective','Preventive'],'Corrective')}${select('priority','Priority',['P1','P2','P3','P4'],request?.priority || 'P3')}${field('assignee','Assigned to','text','Maintenance team')}${field('dueDate','Due date','date',today())}${textarea('notes','Work instructions')}${request ? `<input type="hidden" name="requestId" value="${request.id}">` : ''}`],
-    'triage': ['Triage request', `${select('severity','Severity',['S1','S2','S3','S4'],request?.severity)}${select('priority','Priority',['P1','P2','P3','P4'],request?.priority)}${select('status','Decision',['New','Approved','Closed'],request?.status)}`],
-    'new-equipment': ['Add equipment', `${field('name','Equipment name','text','',true)}${select('kind','Type',['Area','Line','System','Machine','Component'])}<label class="field"><span>Parent asset</span><select name="parentId"><option value="">Top level</option>${db.equipment.map(x => `<option value="${x.id}">${esc(equipmentPath(db.equipment,x.id))}</option>`).join('')}</select></label>${select('status','Status',['Operational','Attention','Out of service'])}${select('criticality','Criticality',['High','Medium','Low'],'Medium')}${textarea('description','Description')}`],
-    'new-pm': ['New preventive plan', `${field('title','Task title','text','',true)}${eqField()}${field('intervalDays','Interval in days','number','30',true)}${field('nextDue','Next due','date',today(),true)}${field('owner','Owner','text','Maintenance team')}${textarea('instructions','Instructions')}`],
-    'new-report': ['New shift report', `${field('date','Date','date',today(),true)}${select('shift','Shift',['Day','Night'])}${field('author','Author','text','Demo user')}${field('downtimeMinutes','Downtime in minutes','number','0')}${select('linkedWorkOrderId','Linked work order',['',...db.workOrders.map(x=>x.id)])}${textarea('summary','Shift summary')}`],
-    'new-part': ['Add spare part', `${field('name','Part name','text','',true)}${field('sku','SKU','text','',true)}${field('quantity','Quantity','number','0')}${field('reorderPoint','Reorder point','number','0')}${field('unit','Unit','text','pcs')}${field('location','Store location')}`],
-    'adjust': ['Adjust stock', `<p class="modal-context">${esc(part?.name)} · current stock ${part?.quantity} ${esc(part?.unit)}</p>${field('delta','Change in quantity (+ or −)','number','0',true)}`],
-    'new-document': ['Add document', `${field('title','Document title','text','',true)}${select('category','Category',['Manual','Procedure','Checklist','Drawing','Other'])}${eqField()}${field('url','Document URL','url')}${textarea('note','Note')}`]
-  };
-  const [title,content] = forms[type] || forms['new-request'];
-  return `<div class="modal-backdrop" data-action="close"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-head"><div><p class="eyebrow">AMMS · DEMO</p><h2>${esc(title)}</h2></div><button type="button" class="close" data-action="close" aria-label="Close">×</button></div><form id="entry-form" data-form="${type}" data-id="${attr(id || '')}"><div class="form-grid">${content}</div><div class="form-actions"><button type="button" class="button secondary" data-action="close">Cancel</button><button type="submit" class="button primary">Save record</button></div></form></div></div>`;
-}
+  const {type,id}=dialog; const req=db.requests.find(x=>x.id===id); const work=db.workOrders.find(x=>x.id===id); const part=db.partRequests.find(x=>x.id===id);
+  const note=textArea('note',t('Decision notes / reason','Observations / motif de décision'));
+  const participantField=checks('participants',t('Maintenance participants','Intervenants maintenance'),['Maintenance Engineer','Maintenance Responsible'].map(r=>[r,label(r)]),[db.role]);
+  const issuedParticipants=checks('participants',t('Assigned maintenance participants','Intervenants maintenance affectés'),['Maintenance Engineer','Maintenance Responsible'].map(r=>[r,label(r)]),['Maintenance Engineer']);
+  const riskChecks=checks('risks',t('Risks to review with HSE','Risques à examiner avec HSE'),[['Electrical / LOTO',t('Electrical / isolation','Électricité / consignation')],['Hot work',t('Hot work','Travaux à chaud')],['Height',t('Work at height','Travail en hauteur')],['Confined space',t('Confined space','Espace confiné')],['Lifting',t('Lifting','Levage')],['Chemicals',t('Chemicals','Produits chimiques')],['Fire systems',t('Fire systems','Systèmes incendie')]],req?.risks);
+  const forms={
+    'new-work':[t('Issue work order','Émettre un ordre de travail'),`${field('title',t('Work order title','Titre de l’ordre de travail'))}${equipmentField()}${field('dueDate',t('Due date','Échéance'),'date',flow.today())}${select('priority',t('Priority — urgency','Priorité — urgence'),[['P1',t('P1 — Immediate','P1 — Immédiate')],['P2',t('P2 — Urgent','P2 — Urgente')],['P3',t('P3 — Planned','P3 — Planifiée')],['P4',t('P4 — Routine','P4 — Courante')]],'P3')}${issuedParticipants}${field('external',t('External contractor (optional)','Prestataire (facultatif)'),'text','',false)}${textArea('notes',t('Work instructions','Instructions de travail'))}<p class="modal-context">${t('Issuance records the Maintenance Responsible approval. The Engineer must visit the zone and submit the site risks to HSE before HSE can approve the work.','L’émission enregistre l’accord du Responsable maintenance. L’ingénieur doit visiter la zone et soumettre les risques sur site à HSE avant son autorisation.')}</p>`],
 
-function commit() { save(db); render(); }
-function flash(message) { notice = message; let old = document.querySelector('.toast'); if (old) old.remove(); const el = document.createElement('div'); el.className='toast'; el.textContent=localizeMessage(message, db.language); document.body.append(el); setTimeout(()=>el.remove(),3500); }
-document.addEventListener('click', e => {
-  const pageButton = e.target.closest('[data-page]'); if (pageButton) { page = pageButton.dataset.page; query=''; filter='All'; dialog=''; render(); return; }
-  const eqButton = e.target.closest('[data-select-equipment]'); if (eqButton) { selectedEquipment=eqButton.dataset.selectEquipment; render(); return; }
-  const filterButton = e.target.closest('[data-filter]'); if (filterButton) { filter=filterButton.dataset.filter; render(); return; }
-  const button = e.target.closest('[data-action]'); if (!button) return;
-  if (button.dataset.action === 'close' && e.target !== button && !e.target.closest('.close')) return;
-  const [action,id] = button.dataset.action.split(':');
-  const restricted = { 'new-request':'request:create','new-work':'work:create','new-equipment':'equipment:manage','new-pm':'preventive:manage','new-report':'report:create','new-part':'parts:manage','new-document':'document:manage',triage:'request:triage',convert:'work:create',advance:'work:update','complete-pm':'preventive:manage',adjust:'parts:manage' };
-  if (restricted[action] && !can(db.role,restricted[action])) return flash('This demo role cannot perform that action.');
-  if (action === 'menu') { document.querySelector('#sidebar').classList.toggle('open'); return; }
-  if (action === 'close') { dialog=''; render(); return; }
-  if (action === 'reset') { if (confirm('Reset all browser demo records?')) { db=seed(); page='Overview'; query=''; filter='All'; commit(); flash('Demo records restored.'); } return; }
-  if (action === 'advance') { const x=db.workOrders.find(w=>w.id===id); if(x) { x.status=x.status==='Planned'?'In progress':'Completed'; commit(); flash(`${x.id} is now ${x.status.toLowerCase()}.`); } return; }
-  if (action === 'complete-pm') { completePreventive(db,id); commit(); flash('Preventive task recorded and next due date updated.'); return; }
-  dialog = action === 'convert' ? `new-work:${id}` : button.dataset.action; render();
-});
-document.addEventListener('input', e => { if (e.target.id === 'global-search') { query=e.target.value.trim().toLowerCase(); const start=e.target.selectionStart; render(); const input=document.querySelector('#global-search'); input.focus(); input.setSelectionRange(start,start); } });
-document.addEventListener('change', e => { if (e.target.id === 'role-select') { db.role=e.target.value; commit(); flash(`Previewing ${db.role} access.`); } if (e.target.id === 'language-select') { db.language=e.target.value; commit(); } });
-document.addEventListener('submit', e => {
-  if (e.target.id !== 'entry-form') return; e.preventDefault();
-  const form=e.target; const type=form.dataset.form; const id=form.dataset.id; const v=Object.fromEntries(new FormData(form));
+    'new-request':[t('New intervention request','Nouvelle demande d’intervention'),`${field('title',t('Problem title','Titre du problème'))}${equipmentField()}${field('reportedBy',t('Reported by','Signalé par'),'text',db.actor || label(db.role))}${select('impact',t('Observed impact','Impact constaté'),[[t('Running with a fault','Fonctionne avec anomalie'),t('Running with a fault','Fonctionne avec anomalie')],[t('Equipment stopped','Équipement arrêté'),t('Equipment stopped','Équipement arrêté')],[t('Safety concern','Risque de sécurité'),t('Safety concern','Risque de sécurité')]])}${textArea('description',t('What did you observe?','Que constatez-vous ?'))}${photoField()}`],
+    assess:[t('Technical assessment','Analyse technique'),`${select('priority',t('Maintenance priority','Priorité maintenance'),[['P1',t('P1 — Immediate','P1 — Immédiate')],['P2',t('P2 — Urgent','P2 — Urgente')],['P3',t('P3 — Planned','P3 — Planifiée')],['P4',t('P4 — Routine','P4 — Courante')]],req?.priority || 'P3')}${textArea('diagnosis',t('Assessment & proposed work','Analyse et travaux proposés'),req?.diagnosis)}${riskChecks}<p class="modal-context">${t('Every intervention requires HSE review, even when no specific risk is selected.','Chaque intervention nécessite une validation HSE, même sans risque spécifique sélectionné.')}</p>`],
+    'site-risk':[t('Site risk assessment','Évaluation des risques sur site'),`${riskChecks}${textArea('note',t('Site observations (optional)','Observations sur site (facultatif)'))}<p class="modal-context">${t('Visit the equipment and zone before submitting. HSE receives the work order after this step, even when no listed risk is found.','Visitez l’équipement et la zone avant de soumettre. HSE reçoit l’OT après cette étape, même si aucun risque listé n’est constaté.')}</p>`],
+    review:[t('Review intervention','Valider l’intervention'),`${select('decision',t('Decision','Décision'),[['approve',t('Approve','Approuver')],['return',t('Return for correction','Retourner pour correction')],['reject',t('Reject','Refuser')]])}${textArea('note',db.role==='HSE'?t('Precautions / comments','Précautions / commentaires'):t('Decision notes / reason','Observations / motif'))}`],
+    'plan-work':[t('Plan work order','Planifier un ordre de travail'),`${field('dueDate',t('Due date','Échéance'),'date',flow.today())}${field('external',t('External contractor (optional)','Prestataire (facultatif)'),'text','',false)}${participantField}${textArea('notes',t('Work instructions','Instructions de travail'),'',false)}`],
+    'complete-work':[t('Complete intervention','Terminer l’intervention'),`${work?.startedAt?'':field('startedAt',t('Start time for this older work order','Heure de début de cet ancien OT'),'datetime-local')}${field('completedAt',t('Completion time (editable)','Heure de fin (modifiable)'),'datetime-local',dialog.completionDefault || localInputTime())}<p class="modal-context">${t('Downtime is calculated automatically from start to finish when saved.','La durée d’arrêt est calculée automatiquement entre le début et la fin à l’enregistrement.')}</p>${textArea('diagnosis',t('Diagnosis','Diagnostic'))}${textArea('cause',t('Root cause','Cause racine'))}${textArea('actions',t('Work performed','Travaux réalisés'))}${field('condition',t('Final equipment condition (optional)','État final de l’équipement (facultatif)'),'text','',false)}${select('repair',t('Repair type','Type de réparation'),[[t('Permanent','Définitive'),t('Permanent','Définitive')],[t('Temporary — follow-up required','Provisoire — suivi nécessaire'),t('Temporary — follow-up required','Provisoire — suivi nécessaire')]])}`],
+    'new-part':[t('Spare-parts purchase request','Demande d’achat de pièces'),`${field('title',t('Part name','Désignation de la pièce'))}${field('reference',t('Manufacturer / part reference (or UNKNOWN)','Référence fabricant / pièce (ou INCONNUE)'))}${equipmentField(work?.equipmentId)}${select('workOrderId',t('Linked work order (optional)','OT lié (facultatif)'),[['',t('No linked work','Sans OT lié')],...db.workOrders.filter(w=>['Awaiting approval','Planned','In progress','Waiting for parts'].includes(w.status)).map(w=>[w.id,`${w.id} · ${w.title}`])],work?.id || '')}${field('quantity',t('Quantity','Quantité'),'number',1)}${field('unit',t('Unit','Unité'),'text','pcs')}${field('neededBy',t('Needed by','Date de besoin'),'date',flow.today())}${select('urgency',t('Priority','Priorité'),['P1','P2','P3','P4'],'P3')}${select('equivalent',t('Equivalent allowed','Équivalent autorisé'),[['no',t('No','Non')],['yes',t('Yes, subject to technical acceptance','Oui, sous réserve de réception technique')]])}${textArea('description',t('Specifications / reason for purchase','Caractéristiques / motif d’achat'))}${photoField()}`],
+    'part-review':[t('Approve purchasing request','Valider la demande d’achat'),`${select('decision',t('Decision','Décision'),[['approve',t('Approve','Approuver')],['reject',t('Reject','Refuser')]])}${note}`],
+    order:[t('Record purchase order','Enregistrer la commande'),`${field('supplier',t('Supplier','Fournisseur'))}${field('orderReference',t('Order reference','Référence commande'))}${field('expectedDate',t('Expected delivery','Livraison prévue'),'date',flow.today())}${textArea('quote',t('Quotation reference, price and currency','Référence devis, prix et devise'))}`],
+    receive:[t('Record delivery','Enregistrer la livraison'),`${field('quantity',t('Quantity received in this delivery','Quantité reçue dans cette livraison'),'number',part?part.quantity-part.acceptedQuantity:1)}${field('deliveryReference',t('Delivery note reference','Référence bon de livraison'))}`],
+    accept:[t('Technical acceptance','Réception technique'),`${field('acceptedQuantity',t('Accepted quantity from this delivery','Quantité acceptée de cette livraison'),'number',part?.deliveries.at(-1)?.quantity || 0)}${textArea('note',t('Conformity check / reason for rejected items','Contrôle de conformité / motif des pièces refusées'))}<p class="modal-context">${t('The remaining quantity is rejected and stays outstanding for replacement delivery.','La quantité restante est refusée et reste à livrer en remplacement.')}</p>`],
+    'close-part':[t('Confirm use / handover','Confirmer utilisation / remise'),textArea('note',t('Where and by whom the parts were used or received','Où et par qui les pièces ont été utilisées ou reçues'))],
+    'new-equipment':[t('Add equipment','Ajouter un équipement'),`${field('name',t('Equipment name','Nom de l’équipement'))}${select('kind',t('Type','Type'),['Area','Line','System','Machine','Component'],'Machine')}${select('parentId',t('Parent equipment / zone','Équipement / zone parent'),[['',t('Top level','Niveau principal')],...orderedEquipment().map(e=>[e.id,path(e.id)])])}${textArea('description',t('Description','Description'),'',false)}`],
+    'new-pm':[t('New preventive plan','Nouveau plan préventif'),`${field('title',t('Task','Tâche'))}${equipmentField()}${field('intervalDays',t('Interval in days','Périodicité en jours'),'number',30)}${field('nextDue',t('Next due','Prochaine échéance'),'date',flow.today())}${textArea('instructions',t('Instructions','Instructions'))}`],
+    'new-report':[t('New shift report','Nouveau rapport de permanence'),`${field('date',t('Date','Date'),'date',flow.today())}${select('shift',t('Shift','Poste'),['Day','Night'])}${select('equipmentId',t('Equipment / zone','Équipement / zone'),[['',t('All equipment','Tous les équipements')],...orderedEquipment().map(e=>[e.id,path(e.id)])])}${textArea('summary',t('Shift observations','Observations du poste'))}${textArea('handover',t('Handover / follow-up','Consignes / suivi'),'',false)}`],
+    'approve-report':[t('Approve report','Approuver le rapport'),note]
+  };
+  const form=forms[type]; if(!form) return '';
+  return `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="${form[0]}"><div class="modal-head"><h2>${form[0]}</h2><button class="close" data-action="cancel" aria-label="${t('Close','Fermer')}">×</button></div><form id="entry"><div class="form-grid">${form[1]}</div><p id="form-error" role="alert"></p><div class="form-actions">${button(t('Cancel','Annuler'),'cancel')}<button type="submit" class="button primary">${t('Save','Enregistrer')}</button></div></form></section></div>`;
+}
+function flash(message) { document.querySelector('.toast')?.remove(); const el=document.createElement('div'); el.className='toast'; el.setAttribute('role','status'); el.textContent=message; document.body.append(el); setTimeout(()=>el.remove(),6000); }
+async function mutate(fn) { const next=structuredClone(db); const result=fn(next); await writeWorkspace(next); db=next; return result; }
+function interventionPrint(request,work) {
+  const id=work?.id || request.id;
+  const actors=[...new Set((work?.history || []).filter(e=>['Work started','Work completed'].includes(e.action)).map(e=>e.actor).filter(Boolean))];
+  const participants=actors.join(', ') || (work?.participants || []).map(label).join(' + ') || '—';
+  const when=work?.startedAt ? new Date(work.startedAt).toLocaleString(db.language) : (request.createdAt || '—');
+  const section=(title,value)=>`<section class="intervention-section"><h2>${title}</h2><p>${esc(value || '—')}</p></section>`;
+  const signatures=[[t('Maintenance executor(s)','Intervenant(s) maintenance'),participants],[t('Maintenance Responsible','Responsable maintenance'),''],['HSE','']];
+  return `<div class="intervention-form"><header class="intervention-header"><div class="intervention-brand"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM"><small>AMMS</small></div><div><h1>${t('MAINTENANCE INTERVENTION SHEET',"FICHE D'INTERVENTION MAINTENANCE")}</h1><p>AGRIDIAM Maintenance Management System</p></div><strong>${esc(id)}</strong></header><table class="intervention-meta"><colgroup><col style="width:14%"><col style="width:44%"><col style="width:14%"><col style="width:28%"></colgroup><tbody><tr><th>${t('Equipment','Équipement')}</th><td>${esc(path(request.equipmentId))}</td><th>${t('Priority','Priorité')}</th><td>${esc(work?.priority || request.priority || '—')}</td></tr><tr><th>${t('Date / time','Date / heure')}</th><td>${esc(when)}</td><th>${t('Downtime','Durée d’arrêt')}</th><td>${work?.downtimeMinutes ?? '—'} min</td></tr><tr><th>${t('Participant(s)','Intervenant(s)')}</th><td colspan="3">${esc(participants)}</td></tr></tbody></table>${section(t('REPORTED PROBLEM','PROBLÈME SIGNALÉ'),request.description)}${section(t('DIAGNOSIS','DIAGNOSTIC'),work?.diagnosis || request.diagnosis)}${section(t('WORK PERFORMED','TRAVAUX RÉALISÉS'),work?.actions)}${section(t('FINAL CONDITION','ÉTAT FINAL'),[work?.condition,work?.repair].filter(Boolean).join(' · '))}<div class="intervention-signatures">${signatures.map(([title,name])=>`<div><strong>${title}</strong><p>${name?esc(name):`${t('Name','Nom')} : __________________`}</p><p>${t('Signature','Signature')} : ______________</p></div>`).join('')}</div></div>`;
+}
+function printRecord() {
+  const r=db[detail[0]].find(x=>x.id===detail[1]);
+  const area=document.querySelector('#print-area');
+  const request=detail[0]==='requests'?r:detail[0]==='workOrders'?db.requests.find(x=>x.id===r.requestId):null;
+  const work=detail[0]==='workOrders'?r:detail[0]==='requests'?db.workOrders.find(x=>x.requestId===r.id):null;
+  if(request) {
+    area.innerHTML=`<div class="print-controls">${button(t('Print / save PDF','Imprimer / enregistrer en PDF'),'print-now')}${button(t('Close preview','Fermer l’aperçu'),'close-print')}</div><div class="print-sheet">${interventionPrint(request,work)}</div>`;
+    area.classList.add('print-preview'); const sheet=area.querySelector('.print-sheet'); sheet.style.setProperty('--print-scale',Math.min(1,950/sheet.scrollHeight)); area.querySelector('button').focus(); return;
+  }
+  area.innerHTML=`<div class="print-controls">${button(t('Print / save PDF','Imprimer / enregistrer en PDF'),'print-now')}${button(t('Close preview','Fermer l’aperçu'),'close-print')}</div><div class="print-sheet"><header class="print-header"><img src="./assets/agridiam-logo.png" alt="AGRIDIAM"><div><h1>${esc(r.id)} · ${esc(r.title || t('Shift report','Rapport de permanence'))}</h1><p>AMMS · ${t('Prototype record — verify before operational use','Document du prototype — vérifier avant utilisation opérationnelle')}</p></div></header><p>${esc(r.equipmentId?path(r.equipmentId):'')}</p><p>${t('Generated','Généré le')} : ${esc(new Date().toLocaleString(db.language))}</p><div class="print-record">${document.querySelector('.record-panel').innerHTML}</div><div class="signatures">${(detail[0]==='partRequests'?[t('Requested by','Demandeur'),t('Maintenance Responsible','Responsable maintenance'),t('Purchasing / receipt','Achats / réception')]:[t('Maintenance executor(s)','Intervenant(s) maintenance'),t('Maintenance Responsible','Responsable maintenance'),'HSE']).map(l=>`<div><strong>${l}</strong><p>${t('Name / date / signature','Nom / date / signature')}</p><div></div></div>`).join('')}</div></div>`;
+  area.querySelectorAll('.print-record button,.history').forEach(el=>el.remove()); area.classList.add('print-preview'); const sheet=area.querySelector('.print-sheet'); sheet.style.setProperty('--print-scale',Math.min(1,950/sheet.scrollHeight)); area.querySelector('button').focus();
+}
+document.addEventListener('click',async e=>{
+  const nav=e.target.closest('[data-page]'); if(nav && !busy) { page=nav.dataset.page; detail=null; dialog=null; query=''; viewFilter='All'; if(page==='Reports') reportTab='interventions'; render(); return; }
+  const tab=e.target.closest('[data-report-tab]'); if(tab && !busy) { reportTab=tab.dataset.reportTab; viewFilter='All'; render(); return; }
+  const filter=e.target.closest('[data-filter]'); if(filter && !busy) { viewFilter=filter.dataset.filter; render(); return; }
+  const target=e.target.closest('[data-action]'); if(!target || busy) return;
+  const {action,id}=target.dataset;
+  if(action==='menu') { document.querySelector('#sidebar').classList.toggle('open'); return; }
+  if(action==='remove-photo') { pendingPhotos.splice(Number(id),1); document.querySelector('#photo-preview').innerHTML=photoPreview(); return; }
+  if(action==='cancel') { dialog=null; pendingPhotos=[]; render(); return; }
+  if(action==='back') { detail=null; render(); return; }
+  if(action==='open') { detail=id.split(':'); const destination=({requests:'Requests',workOrders:'Work',partRequests:'Parts',reports:'Reports'})[detail[0]]; if(destination!==page) { page=destination; viewFilter='All'; query=''; } render(); return; }
+  if(action==='open-report-intervention') { detail=id.split(':'); render(); return; }
+  if(action==='print') { printRecord(); return; }
+  if(action==='print-now') { window.print(); return; }
+  if(action==='close-print') { document.querySelector('#print-area').classList.remove('print-preview'); document.querySelector('[data-action="print"]')?.focus(); return; }
+  if(action==='export') { const url=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download=`AMMS-backup-${flow.today()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }
   try {
-    if (type==='new-request') addRequest(db,v);
-    if (type==='new-work') createWorkOrder(db,v);
-    if (type==='triage') { const x=db.requests.find(x=>x.id===id); Object.assign(x,{severity:v.severity,priority:v.priority,status:v.status}); }
-    if (type==='new-equipment') db.equipment.push({id:nextId(db.equipment,'EQ'),name:v.name.trim(),kind:v.kind,parentId:v.parentId||null,status:v.status,criticality:v.criticality,description:v.description.trim()});
-    if (type==='new-pm') db.preventive.push({id:nextId(db.preventive,'PM'),title:v.title.trim(),equipmentId:v.equipmentId,intervalDays:Math.max(1,Number(v.intervalDays)),nextDue:v.nextDue,owner:v.owner.trim(),instructions:v.instructions.trim()});
-    if (type==='new-report') db.reports.unshift({id:nextId(db.reports,'SR'),date:v.date,shift:v.shift,author:v.author.trim(),summary:v.summary.trim(),downtimeMinutes:Math.max(0,Number(v.downtimeMinutes)),linkedWorkOrderId:v.linkedWorkOrderId||null});
-    if (type==='new-part') db.parts.push({id:nextId(db.parts,'SP'),name:v.name.trim(),sku:v.sku.trim(),quantity:Math.max(0,Number(v.quantity)),reorderPoint:Math.max(0,Number(v.reorderPoint)),unit:v.unit.trim()||'pcs',location:v.location.trim()});
-    if (type==='adjust') { const part=db.parts.find(x=>x.id===id); const next=part.quantity+Number(v.delta); if(next<0) throw new Error('Stock cannot be negative.'); part.quantity=next; }
-    if (type==='new-document') { if (v.url && !/^https?:\/\//i.test(v.url)) throw new Error('Use an http or https document URL.'); db.documents.push({id:nextId(db.documents,'DOC'),title:v.title.trim(),category:v.category,equipmentId:v.equipmentId,url:v.url.trim(),note:v.note.trim()}); }
-    dialog=''; commit(); flash('Record saved in this browser.');
-  } catch (err) { flash(err.message || 'Could not save record.'); }
+    if(action==='start-work' || action==='generate-pm') {
+      busy=true; await mutate(next=>action==='start-work'?flow.updateWork(next,id,'start'):flow.generatePM(next,id)); render(); flash(t('Saved in this browser.','Enregistré dans ce navigateur.')); return;
+    }
+    dialog={type:action,id,completionDefault:action==='complete-work'?localInputTime():undefined}; pendingPhotos=[]; render();
+  } catch(err) { flash(err.message); } finally { busy=false; }
 });
-render();
+document.addEventListener('input',e=>{
+  if(e.target.id==='search') { query=e.target.value.toLowerCase(); const pos=e.target.selectionStart; render(); const input=document.querySelector('#search'); input.focus(); input.setSelectionRange(pos,pos); }
+});
+document.addEventListener('change',async e=>{
+  const el=e.target;
+  if(el.id==='report-date') { reportDate=el.value; render(); return; }
+  if(el.id==='photos') {
+    const currentDialog=dialog; busy=true; const submit=document.querySelector('#entry [type=submit]'); submit.disabled=true;
+    try { if(pendingPhotos.length+el.files.length>4) throw new Error(t('Up to 4 photos per request.','Maximum 4 photos par demande.')); const images=await readPhotos([...el.files]); if(dialog===currentDialog) { pendingPhotos.push(...images); document.querySelector('#photo-preview').innerHTML=photoPreview(); document.querySelector('#photo-error').textContent=''; } }
+    catch(err) { document.querySelector('#photo-error').textContent=err.message; }
+    finally { el.value=''; busy=false; submit.disabled=false; } return;
+  }
+  if(el.id==='language' || el.name==='role' || el.name==='actor') {
+    try { await mutate(next=>{ if(el.id==='language') next.language=el.value; else next[el.name]=el.value; }); render(); } catch(err) { flash(err.message); }
+  }
+  if(el.name==='workOrderId' && el.value) { const w=db.workOrders.find(w=>w.id===el.value); document.querySelector('[name=equipmentId]').value=w.equipmentId; }
+});
+document.addEventListener('keydown',e=>{
+  if(!dialog) return;
+  if(e.key==='Escape' && !busy) { dialog=null; pendingPhotos=[]; render(); }
+  if(e.key==='Tab') { const nodes=[...document.querySelectorAll('.modal button,.modal input,.modal select,.modal textarea,.modal a')].filter(el=>!el.disabled); const first=nodes[0],last=nodes.at(-1); if(e.shiftKey && document.activeElement===first) { e.preventDefault(); last.focus(); } else if(!e.shiftKey && document.activeElement===last) { e.preventDefault(); first.focus(); } }
+});
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='entry') return; e.preventDefault(); if(busy) return;
+  const values=new FormData(e.target),v=Object.fromEntries(values); v.photos=pendingPhotos; if(dialog.type!=='new-report') v.risks=values.getAll('risks'); v.participants=values.getAll('participants'); const {type,id}=dialog;
+  if(type==='complete-work' && v.completedAt===dialog.completionDefault) delete v.completedAt;
+  busy=true; const submit=e.target.querySelector('[type=submit]'); submit.disabled=true;
+  try {
+    await mutate(next=>{
+      if(type==='new-work') flow.issueWork(next,v);
+      else if(type==='site-risk') flow.submitSiteRiskAssessment(next,id,v);
+      else if(type==='new-request') flow.addRequest(next,v);
+      else if(type==='assess') flow.assess(next,id,v);
+      else if(type==='review') flow.reviewRequest(next,id,v.decision,v);
+      else if(type==='plan-work') flow.createWork(next,id,v);
+      else if(type==='complete-work') flow.updateWork(next,id,'complete',v);
+      else if(type==='new-part') flow.addPartRequest(next,v);
+      else if(type==='part-review') flow.updatePart(next,id,v.decision,v);
+      else if(['order','receive','accept','close-part'].includes(type)) flow.updatePart(next,id,type==='close-part'?'close':type,v);
+      else if(type==='new-equipment') flow.addEquipment(next,v);
+      else if(type==='new-pm') flow.addPM(next,v);
+      else if(type==='new-report') flow.addReport(next,v);
+      else if(type==='approve-report') flow.approveReport(next,id,v);
+      else throw new Error('Unknown action');
+    });
+    dialog=null; pendingPhotos=[]; render(); flash(t('Saved in this browser.','Enregistré dans ce navigateur.'));
+  } catch(err) { document.querySelector('#form-error').textContent=err.message; submit.disabled=false; }
+  finally { busy=false; }
+});
+try { db=await readWorkspace(); render(); finishSplash(); } catch(err) { app.innerHTML=`<main class="content"><h1>AMMS</h1><p>${esc(err.message)}</p><p>Saved data has not been overwritten. / Les données enregistrées n’ont pas été écrasées.</p></main>`; finishSplash(true); }
+

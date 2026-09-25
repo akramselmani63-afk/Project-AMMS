@@ -2,13 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#152c35" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>AMMS · AGRIDIAM Maintenance Management System</title>
+    <link rel="icon" type="image/png" href="./assets/amms-app-icon-green-a.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./src/app.js"></script>
+    <script>if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});</script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="splash" class="splash" role="status" aria-label="Opening AMMS / Ouverture d’AMMS">
+      <div class="splash-content">
+        <img class="splash-logo" src="./assets/amms-logo-monitoring.png" alt="AMMS · AGRIDIAM Maintenance Monitoring System" />
+        <div class="splash-credit"><span>BY</span><img src="./assets/agridiam-logo.png" alt="AGRIDIAM" /></div>
+      </div>
+    </div>
+    <div id="app" inert></div>
   </body>
 </html>
+

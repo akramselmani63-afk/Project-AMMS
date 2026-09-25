@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node server.js",
     "build": "node scripts/build.js",
+    "portable": "node scripts/portable.js",
     "test": "node --test"
   }
 }
+
