@@ -14,7 +14,10 @@ const image = async path => {
   try { return await readFile(resolve(root, path)); }
   catch (error) {
     if (error.code !== 'ENOENT') throw error;
-    return Buffer.from((await read(`${path}.b64`)).trim(), 'base64');
+    const encoded = await read(`${path}.b64`).catch(async () =>
+      (await read(`${path}.b64.1`)) + (await read(`${path}.b64.2`))
+    );
+    return Buffer.from(encoded.trim(), 'base64');
   }
 };
 const logo = `data:image/png;base64,${(await image('assets/agridiam-logo.png')).toString('base64')}`;
