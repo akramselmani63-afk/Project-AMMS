@@ -73,7 +73,7 @@ public final class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (ASSET_HOST.equals(uri.getHost()) && "https".equals(uri.getScheme())) return false;
+                if (ASSET_HOST.equals(uri.getHost()) && "https".equals(uri.getScheme()) && uri.getPath().startsWith("/assets/www/")) return false;
                 if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -103,7 +103,7 @@ public final class MainActivity extends Activity {
             }
         });
 
-        if (state == null || !webView.restoreState(state).equals(webView)) {
+        if (state == null || webView.restoreState(state) == null) {
             webView.loadUrl(START_URL);
         }
     }
