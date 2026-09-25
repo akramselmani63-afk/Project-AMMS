@@ -78,3 +78,8 @@ Automated tests cover role gates, Engineer site-risk submission, HSE review, bot
 
 No shared server database, real accounts, protected audit log, remote notifications, automatic content translation or digital signatures are configured. Finalized records are read-only through this UI. This version is for workflow review on one browser; operational deployment still requires server-side authorization, shared storage/backups and AGRIDIAM validation of procedures and source data.
 
+
+
+## Android APK
+
+The `android` module wraps the offline AMMS page in an Android WebView and provides phone navigation, photo selection, printing and backup export. On an open pull request to `main`, GitHub Actions builds an installable debug APK and attaches it as the `AMMS-Android-APK` workflow artifact. Download and unzip that artifact to install `app-debug.apk) on an Android test phone. Records are stored locally on that device and do not sync with Windows or other phones.
