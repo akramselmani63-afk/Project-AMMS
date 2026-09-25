@@ -39,6 +39,10 @@ jobs:
           npm run portable
           mkdir -p android/app/src/main/assets/www
           cp AMMS-Prototype.html android/app/src/main/assets/www/index.html
+      - name: Prepare branded Android launcher icon
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          cat assets/amms-app-icon-green-a.png.b64.1 assets/amms-app-icon-green-a.png.b64.2 | base64 --decode > android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
       - name: Assemble debug APK
         run: gradle --no-daemon -p android assembleDebug
       - uses: actions/upload-artifact@v4
