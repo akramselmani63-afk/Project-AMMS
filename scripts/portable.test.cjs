@@ -28,12 +28,18 @@ test('portable file opens records from every list', async () => {
   vm.runInContext(script, context);
   const workspace = vm.runInContext('workflow.seed()', context);
   workspace.actor = 'Akram Selmani';
+  context.workspace = workspace;
+  vm.runInContext('workflow.generatePM(workspace, workspace.preventive[0].id)', context);
   workspace.partRequests.push({ id: 'SP-TEST', title: 'Test part', equipmentId: workspace.equipment[0].id, status: 'Purchasing', reference: 'REF-1', quantity: 1, unit: 'pcs', acceptedQuantity: 0, rejectedQuantity: 0, deliveries: [], photos: [] });
   saved = JSON.stringify(workspace);
   await new Promise(resolve => setImmediate(resolve));
-  const openWork = workspace.workOrders.filter(w => !['Closed','Legacy completed'].includes(w.status));
+  const orphanWork = workspace.workOrders.filter(w => !workspace.requests.some(r => r.id === w.requestId));
+  const openCount = workspace.requests.filter(r => !['Closed','Legacy completed','Rejected'].includes(workspace.workOrders.find(w => w.requestId === r.id)?.status || r.status)).length + orphanWork.filter(w => !['Closed','Legacy completed','Rejected'].includes(w.status)).length;
+  const allCount = workspace.requests.length + orphanWork.length;
   assert.match(app.innerHTML, /class="priority-donut" style="background:conic-gradient\(/, 'overview renders the priority circle');
-  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openWork.length}</strong>`), 'circle total matches open work');
+  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openCount}</strong>`), 'open circle includes new and preventive interventions');
+  await listeners.click({ target: { closest: selector => selector === '[data-priority-scope]' ? { dataset: { priorityScope: 'all' } } : null } });
+  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${allCount}</strong>`), 'all circle includes closed interventions');
 
   const click = async (attribute, value) => listeners.click({ target: { closest: selector => selector === `[${attribute}]` ? { dataset: { [attribute === 'data-page' ? 'page' : attribute === 'data-report-tab' ? 'reportTab' : 'action']: value, id: value } } : null } });
   const open = async (page, action, collection) => {
