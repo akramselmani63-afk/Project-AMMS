@@ -230,18 +230,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .record-navigation{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .purchase-progress{grid-template-columns:repeat(var(--stage-count,5),minmax(0,1fr))}
 @media(min-width:781px){
-  .sidebar{width:70px;overflow:hidden;box-shadow:4px 0 14px #0a305714}
+  .sidebar{width:70px;overflow:hidden;transition:none;box-shadow:4px 0 14px #0a305714}
   .sidebar:hover,.sidebar:focus-within{width:264px;margin-right:-194px;box-shadow:12px 0 28px #0a30572b}
   .sidebar .brand{padding:7px;align-items:center;justify-content:center}
   .sidebar .brand-logo{display:none}
   .sidebar .brand-mini{display:block;width:54px;height:54px;object-fit:contain}
-  .sidebar .workspace-label,.sidebar .nav-label,.sidebar .sidebar-foot{display:none}
-  .sidebar nav{padding:17px 9px}
-  .sidebar .nav-item{justify-content:center;padding:10px}
+  .sidebar .workspace-label{height:60px;visibility:hidden}
+  .sidebar .nav-label,.sidebar .sidebar-foot{display:none}
+  .sidebar nav{padding:0 11px 14px}
+  .sidebar .nav-item{justify-content:flex-start;padding:8px 12px}
   .sidebar:hover .brand,.sidebar:focus-within .brand{padding:7px 17px}
   .sidebar:hover .brand-logo,.sidebar:focus-within .brand-logo{display:block}
   .sidebar:hover .brand-mini,.sidebar:focus-within .brand-mini{display:none}
-  .sidebar:hover .workspace-label,.sidebar:focus-within .workspace-label,.sidebar:hover .nav-label,.sidebar:focus-within .nav-label,.sidebar:hover .sidebar-foot,.sidebar:focus-within .sidebar-foot{display:flex}
+  .sidebar:hover .workspace-label,.sidebar:focus-within .workspace-label{visibility:visible}
+  .sidebar:hover .nav-label,.sidebar:focus-within .nav-label,.sidebar:hover .sidebar-foot,.sidebar:focus-within .sidebar-foot{display:flex}
   .sidebar:hover .sidebar-foot,.sidebar:focus-within .sidebar-foot{display:block}
   .sidebar:hover nav,.sidebar:focus-within nav{padding:0 11px 14px}
   .sidebar:hover .nav-item,.sidebar:focus-within .nav-item{justify-content:flex-start;padding:8px 12px}
@@ -254,6 +256,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:540px){.overview-layout .queue-row{display:grid;grid-template-columns:1fr auto;gap:8px}.overview-layout .queue-id{width:auto}.overview-layout .queue-main{grid-column:1/-1;grid-row:2;min-width:0}.overview-layout .queue-status{grid-column:2;grid-row:1;padding:0;max-width:none}}
 @media(max-width:780px){.topbar .search{width:auto;min-width:0}.top-actions{flex:1}.role-chip{max-width:130px}}
 @media(max-width:540px){.topbar .search{width:90px}.top-actions .role-chip{max-width:95px}}
+@media(max-width:1000px){
+  .table-wrap{overflow:visible;border:0;background:transparent;box-shadow:none}
+  .table-wrap table,.table-wrap tbody{display:block;min-width:0;width:100%}
+  .table-wrap thead{display:none}
+  .table-wrap tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;padding:17px;margin-bottom:12px;border:1px solid var(--amms-line);border-radius:10px;background:#fff;box-shadow:0 3px 12px #113f700a}
+  .table-wrap td{display:block;min-width:0;padding:0;border:0;overflow-wrap:anywhere}
+  .table-wrap td:first-child,.table-wrap td:nth-child(2),.table-wrap td:last-child{grid-column:1/-1}
+  .table-wrap td::before{content:attr(data-label);display:block;margin-bottom:4px;color:#657f8e;font-size:11px;font-weight:700;text-transform:uppercase}
+  .table-wrap td:first-child::before,.table-wrap td:last-child::before{display:none}
+  .table-wrap td:last-child .button{width:100%;min-height:44px}
+}
 @media(max-width:780px){
   body.drawer-open{overflow:hidden}
   .topbar{position:sticky;top:0;z-index:8}
@@ -285,7 +298,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .panel h2,.pm-card h2,.document-card h2{font-size:19px}
   .panel p,.detail-panel p,.pm-card p,.document-card p,.record-panel p{font-size:14px}
   .badge{font-size:12px}
-  .table-wrap table{min-width:900px}
+  .table-wrap table{min-width:min(900px,100%)}
   th,.detail-grid small,.card-meta small{font-size:12px}
   td,.detail-grid strong,.card-meta strong,.role-grid ul,.asset-tree li{font-size:14px}
   td small,.asset-tree small,.equipment-node>summary>span,.photo-grid figcaption{font-size:12px}
