@@ -271,3 +271,44 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .drawer-close{top:25px;right:14px;width:42px;height:42px;border-radius:10px;font-size:26px}
   .drawer-scrim.visible{background:#061e3db8;backdrop-filter:blur(3px)}
 }
+
+/* Readable type throughout the interactive app; printed forms keep their A4 sizing. */
+@media screen{
+  body{font-size:14px}
+  .nav-item,.sidebar .nav-item{font-size:15px}
+  .breadcrumb,.search input,.role-chip,.signout-button{font-size:14px}
+  .demo-banner,.sidebar-foot p,.source-note,.source-note p{font-size:13px!important}
+  .sidebar-foot strong,.sidebar-foot .button{font-size:13px}
+  .workspace-label,.eyebrow{font-size:12px}
+  .section-head .lede,.legend,.role-panel>p,.role-grid p,.equipment-node-body>p,.asset-detail p,.history p{font-size:14px}
+  .button,.filter,.inline-button,.text-button,.record-actions .button{font-size:14px}
+  .panel h2,.pm-card h2,.document-card h2{font-size:19px}
+  .panel p,.detail-panel p,.pm-card p,.document-card p,.record-panel p{font-size:14px}
+  .badge{font-size:12px}
+  .table-wrap table{min-width:900px}
+  th,.detail-grid small,.card-meta small{font-size:12px}
+  td,.detail-grid strong,.card-meta strong,.role-grid ul,.asset-tree li{font-size:14px}
+  td small,.asset-tree small,.equipment-node>summary>span,.photo-grid figcaption{font-size:12px}
+  .tree-button,.equipment-node>summary,.history summary,.asset-detail summary{font-size:15px}
+  .mini-row strong,.queue-main strong{font-size:14px}
+  .mini-row small,.queue-main small,.queue-id,.mini-row>span:not(.badge){font-size:12px}
+  .field,.checks label,.report-toolbar label{font-size:14px}
+  .field input,.field select,.field textarea,.report-toolbar select{font-size:15px}
+  .field small,.modal-context,.source-note small{font-size:12px}
+  .report-tabs button,.report-toolbar p,.intervention-card-description,.intervention-card-asset,.intervention-card-foot>span{font-size:14px}
+  .report-tabs span,.report-day-head span,.intervention-card-facts{font-size:12px}
+  .report-day-head h2{font-size:19px}
+  .intervention-card-head h3{font-size:18px}
+  .wizard-step,.purchase-stage{font-size:13px}
+  .signin-card>p,.auth-tabs button,.demo-access summary,#auth-message{font-size:14px}
+  #account-form .field,#signin-form .field{font-size:14px}
+  .signin-footer,.signin-aside>span{font-size:12px}
+}
+@media screen and (max-width:540px){
+  .top-actions .role-chip{font-size:12px;max-width:112px}
+  .demo-banner{font-size:12px!important}
+  .section-head .lede{font-size:14px}
+  .report-tabs button{font-size:13px}
+  .wizard-step,.purchase-stage{font-size:11px}
+  .field input,.field select,.field textarea{font-size:16px}
+}
