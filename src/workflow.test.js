@@ -11,6 +11,15 @@ function approved(db,participants=['Maintenance Engineer']) {
   db.role='Maintenance Engineer'; return f.createWork(db,r.id,{dueDate:f.today(),participants});
 }
 const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
+test('linked request and work order share intervention progress',()=>{
+  const r={status:'Submitted'},w={status:'Awaiting risk assessment'};
+  assert.equal(f.interventionProgressStep(r),1);
+  r.status='Approval review'; assert.equal(f.interventionProgressStep(r),2);
+  r.status='Approved'; assert.equal(f.interventionProgressStep(r,w),3);
+  w.status='Awaiting approval'; assert.equal(f.interventionProgressStep(r,w),3);
+  w.status='In progress'; assert.equal(f.interventionProgressStep(r,w),4);
+  w.status='Closed'; assert.equal(f.interventionProgressStep(r,w),6);
+});
 test('employee reports photos but cannot assess, approve, execute or purchase',()=>{
   const db=f.seed(),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
   assert.throws(()=>f.assess(db,r.id,{priority:'P1'}),/role/);
