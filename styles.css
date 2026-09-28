@@ -179,7 +179,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .overview-side .mini-row{align-items:flex-start;flex-wrap:wrap}
 .overview-side .mini-row>div{flex:1;min-width:150px}
 .overview-side .mini-row .badge{align-self:center}
-.pulse-panel .panel-head{margin-bottom:8px}
+.pulse-panel .panel-head{margin-bottom:8px;gap:12px;flex-wrap:wrap}
+.priority-scope{display:inline-flex;gap:3px;padding:3px;border:1px solid #d7e5ec;border-radius:9px;background:#f3f7f9}
+.priority-scope button{min-height:34px;padding:5px 12px;border:0;border-radius:6px;background:transparent;color:#547085;font-size:12px;font-weight:700}
+.priority-scope button.active{background:#fff;color:#0c4b89;box-shadow:0 1px 5px #173f5c1c}
 .priority-chart{display:flex;align-items:center;justify-content:center;gap:clamp(20px,5vw,56px);padding:14px 8px 4px}
 .priority-donut{position:relative;display:grid;place-items:center;flex:none;width:174px;aspect-ratio:1;border-radius:50%}
 .priority-donut::before{content:'';position:absolute;inset:28px;border-radius:50%;background:#fff}
