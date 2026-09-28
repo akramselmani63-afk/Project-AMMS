@@ -205,7 +205,8 @@ export function updatePart(db,id,action,v) {
     p.status=action==='approve'?'Purchasing':'Rejected'; audit(db,p,p.status,note);
   } else if(action==='order') {
     allow(db,'purchase'); stage(p,'Purchasing');
-    Object.assign(p,{supplier:required(v,'supplier'),orderReference:required(v,'orderReference'),expectedDate:required(v,'expectedDate'),quote:optional(v,'quote'),status:'Ordered'}); audit(db,p,'Ordered',p.orderReference);
+    if(v.proforma && (!/^data:(application\/pdf|image\/(jpeg|png|webp));base64,/.test(v.proforma.data) || v.proforma.data.length>11_200_000)) throw new Error('Invalid proforma attachment. / Pièce jointe proforma invalide.');
+    Object.assign(p,{supplier:required(v,'supplier'),orderReference:required(v,'orderReference'),expectedDate:required(v,'expectedDate'),quote:optional(v,'quote'),proforma:v.proforma || null,status:'Ordered'}); audit(db,p,'Ordered',p.orderReference);
   } else if(action==='receive') {
     allow(db,'purchase'); stage(p,'Ordered','Partial acceptance');
     const quantity=number(v.quantity,1); requireValue(Number.isInteger(quantity) && quantity<=p.quantity-p.acceptedQuantity,'Receipt exceeds outstanding quantity.');
@@ -280,4 +281,3 @@ export function statusMatches(item,filter) {
   if(filter==='Closed') return ['Closed','Legacy completed'].includes(item.status);
   return item.status===filter;
 }
-
