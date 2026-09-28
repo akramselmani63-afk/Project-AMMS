@@ -31,6 +31,9 @@ test('portable file opens records from every list', async () => {
   workspace.partRequests.push({ id: 'SP-TEST', title: 'Test part', equipmentId: workspace.equipment[0].id, status: 'Purchasing', reference: 'REF-1', quantity: 1, unit: 'pcs', acceptedQuantity: 0, rejectedQuantity: 0, deliveries: [], photos: [] });
   saved = JSON.stringify(workspace);
   await new Promise(resolve => setImmediate(resolve));
+  const openWork = workspace.workOrders.filter(w => !['Closed','Legacy completed'].includes(w.status));
+  assert.match(app.innerHTML, /class="priority-donut" style="background:conic-gradient\(/, 'overview renders the priority circle');
+  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openWork.length}</strong>`), 'circle total matches open work');
 
   const click = async (attribute, value) => listeners.click({ target: { closest: selector => selector === `[${attribute}]` ? { dataset: { [attribute === 'data-page' ? 'page' : attribute === 'data-report-tab' ? 'reportTab' : 'action']: value, id: value } } : null } });
   const open = async (page, action, collection) => {
