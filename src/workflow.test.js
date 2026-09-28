@@ -80,6 +80,15 @@ test('Responsible part requests go directly to purchasing; all narrative fields 
   const report=f.addReport(db,{date:f.today(),shift:'Day'}); assert.equal(report.summary,'');
   db.role='Maintenance Responsible'; f.approveReport(db,report.id,{}); assert.equal(report.status,'Approved');
 });
+test('purchase order keeps a PDF proforma and rejects unsafe attachments',()=>{
+  const db=f.seed(); db.role='Maintenance Responsible';
+  const p=f.addPartRequest(db,{title:'Bearing',reference:'TEST-02',equipmentId:'EQ-140',quantity:1,neededBy:f.today()});
+  db.role='Purchasing Department';
+  const order={supplier:'Demo',orderReference:'PO-02',expectedDate:f.today()};
+  assert.throws(()=>f.updatePart(db,p.id,'order',{...order,proforma:{name:'bad.html',data:'data:text/html;base64,PGgxPg=='}}),/Invalid proforma/);
+  f.updatePart(db,p.id,'order',{...order,proforma:{name:'quote.pdf',data:'data:application/pdf;base64,JVBERi0='}});
+  assert.equal(p.proforma.name,'quote.pdf');
+});
 test('v3 migration preserves approvals and data while exposing both reviewers',()=>{
   const db=f.seed(); db.schemaVersion=3;
   const a=db.requests[0],b=db.requests[1]; a.status='Responsible review'; a.photos=[{name:'keep.jpg'}];
@@ -209,4 +218,3 @@ test('status tabs include existing new, approval-pending and historical closed r
  assert.equal(rows.filter(r=>f.statusMatches(r,'Closed')).length,2);
  assert.equal(rows.filter(r=>f.statusMatches(r,'Approved')).length,1);
 });
-
