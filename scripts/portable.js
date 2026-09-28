@@ -27,7 +27,7 @@ const assets = await source('src/source-assets.js', '', ['sourceTitle', 'sourceE
 const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath', 'sortedEquipment']);
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
   'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
-  'addRequest', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
+  'addRequest', 'canRemoveIntervention', 'removeIntervention', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
   'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'addPM',
   'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
