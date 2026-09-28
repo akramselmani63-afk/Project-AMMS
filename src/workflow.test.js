@@ -6,9 +6,9 @@ import { validatePhotos } from './photos.js';
 const request = db => { db.role='Employee'; return f.addRequest(db,{title:'TEST motor',description:'Illustrative vibration',reportedBy:'Demo operator',equipmentId:'EQ-140',photos:[{name:'demo.jpg',data:'data:image/jpeg;base64,AA=='}]}); };
 function approved(db,participants=['Maintenance Engineer']) {
   const r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P2',diagnosis:'Check bearings',risks:['Electrical / LOTO']});
-  db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Planned intervention'});
+  db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Planned intervention',participants});
   db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Isolate and verify absence of energy'});
-  db.role='Maintenance Engineer'; return f.createWork(db,r.id,{dueDate:f.today(),participants});
+  db.role='Maintenance Engineer'; return db.workOrders.find(w=>w.requestId===r.id);
 }
 const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
 test('linked request and work order share intervention progress',()=>{
@@ -17,8 +17,8 @@ test('linked request and work order share intervention progress',()=>{
   r.status='Approval review'; assert.equal(f.interventionProgressStep(r),2);
   r.status='Approved'; assert.equal(f.interventionProgressStep(r,w),3);
   w.status='Awaiting approval'; assert.equal(f.interventionProgressStep(r,w),3);
-  w.status='In progress'; assert.equal(f.interventionProgressStep(r,w),4);
-  w.status='Closed'; assert.equal(f.interventionProgressStep(r,w),6);
+  w.status='In progress'; assert.equal(f.interventionProgressStep(r,w),3);
+  w.status='Closed'; assert.equal(f.interventionProgressStep(r,w),5);
 });
 test('employee reports photos but cannot assess, approve, execute or purchase',()=>{
   const db=f.seed(),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
@@ -39,6 +39,7 @@ for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible'
     if(index===0) { assert.notEqual(r.status,'Approved'); db.role='Maintenance Engineer'; assert.throws(()=>f.createWork(db,r.id,{dueDate:f.today()}),/stage/); }
   }
   assert.equal(r.status,'Approved'); assert.ok(r.approval && r.hseApproval);
+  assert.equal(db.workOrders.filter(w=>w.requestId===r.id).length,1);
 });
 test('return resets both approvals and requires reassessment without a mandatory reason',()=>{
   const db=f.seed(),r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P1'});
@@ -68,7 +69,7 @@ test('v4 migration renames purchasing role and routes pending direct orders thro
   const r={id:'IR-900',title:'Legacy direct',equipmentId:'EQ-140',status:'HSE review',priority:'P3',issuedByResponsible:true,approval:{actor:'Responsible'},risks:[],history:[]};
   const w={id:'WO-900',title:r.title,equipmentId:r.equipmentId,requestId:r.id,status:'Awaiting approval',participants:['Maintenance Responsible'],history:[]};
   db.requests.unshift(r); db.workOrders.unshift(w); f.migrate(db);
-  assert.equal(db.schemaVersion,7); assert.equal(db.role,'Purchasing Department'); assert.equal(r.status,'Site risk assessment'); assert.equal(w.status,'Awaiting risk assessment'); assert.ok(w.participants.includes('Maintenance Engineer'));
+  assert.equal(db.schemaVersion,8); assert.equal(db.role,'Purchasing Department'); assert.equal(r.status,'Site risk assessment'); assert.equal(w.status,'Awaiting risk assessment'); assert.ok(w.participants.includes('Maintenance Engineer'));
 });
 for(const participants of [['Maintenance Engineer'],['Maintenance Responsible'],['Maintenance Engineer','Maintenance Responsible']]) test('completion closes work for '+participants.join(' + ')+' with paper signatures',()=>{
   const db=f.seed(),w=approved(db,participants); db.role=participants[0];
@@ -93,7 +94,7 @@ test('v6 saved part requests gain missing delivery fields without losing their d
   const db=f.seed(); db.schemaVersion=6;
   const part={id:'SPR-001',title:'Existing bearing',reference:'B-01',status:'Purchasing',quantity:2};
   db.partRequests=[part]; f.migrate(db);
-  assert.equal(db.schemaVersion,7);
+  assert.equal(db.schemaVersion,8);
   assert.deepEqual(part.deliveries,[]);
   assert.deepEqual(part.photos,[]);
   assert.equal(part.acceptedQuantity,0);
@@ -112,7 +113,7 @@ test('v3 migration preserves approvals and data while exposing both reviewers',(
   const db=f.seed(); db.schemaVersion=3;
   const a=db.requests[0],b=db.requests[1]; a.status='Responsible review'; a.photos=[{name:'keep.jpg'}];
   b.status='HSE review'; b.approval={actor:'Existing Responsible',at:'2026-09-21'};
-  f.migrate(db); assert.equal(db.schemaVersion,7); assert.equal(a.status,'Approval review'); assert.equal(a.photos[0].name,'keep.jpg');
+  f.migrate(db); assert.equal(db.schemaVersion,8); assert.equal(a.status,'Approval review'); assert.equal(a.photos[0].name,'keep.jpg');
   assert.equal(b.status,'HSE review'); assert.equal(b.approval.actor,'Existing Responsible');
   assert.equal(f.canReviewRequest('HSE',a),true); assert.equal(f.canReviewRequest('Maintenance Responsible',a),true);
 });
@@ -153,7 +154,7 @@ test('PM generates one open intervention and moves date when work is completed',
   f.assess(db,r.id,{priority:'P3',diagnosis:'Planned inspection'});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Approved'});
   db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Precautions checked'});
-  db.role='Maintenance Engineer'; const w=f.createWork(db,r.id,{dueDate:f.today(),participants:['Maintenance Engineer']});
+  db.role='Maintenance Engineer'; const w=db.workOrders.find(w=>w.requestId===r.id);
   f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   assert.equal(p.lastCompleted,f.today()); assert.notEqual(p.nextDue,due); assert.doesNotThrow(()=>f.generatePM(db,p.id));
 });
