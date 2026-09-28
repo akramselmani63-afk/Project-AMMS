@@ -130,8 +130,10 @@ function partsProgress(item) {
   return `<div class="purchase-progress" aria-label="${t('Purchasing progress','Avancement de l’achat')}">${stages.map((name,index)=>`<div class="purchase-stage ${index<current?'done':index===current?'current':''}"><span>${index<current?'✓':index+1}</span><strong>${name}</strong></div>`).join('')}</div>`;
 }
 function workProgress(item) {
-  const stages=item.requestId?[t('Request','Demande'),t('Review','Validation'),t('Work order','Ordre de travail'),t('HSE','HSE'),t('Work','Travaux'),t('Completed','Terminée')]:[t('Work order','Ordre de travail'),t('Site risks','Risques sur site'),t('HSE','HSE'),t('Work','Travaux'),t('Completed','Terminée')];
-  const states=item.requestId?{'Awaiting risk assessment':3,'Awaiting approval':3,Planned:4,'In progress':4,'Waiting for parts':4,Closed:6}:{'Awaiting risk assessment':1,'Awaiting approval':2,Planned:3,'In progress':3,'Waiting for parts':3,Closed:5};
+  const request=item.requestId && db.requests.find(r=>r.id===item.requestId);
+  if(request) return requestProgress(request);
+  const stages=[t('Work order','Ordre de travail'),t('Site risks','Risques sur site'),t('HSE','HSE'),t('Work','Travaux'),t('Completed','Terminée')];
+  const states={'Awaiting risk assessment':1,'Awaiting approval':2,Planned:3,'In progress':3,'Waiting for parts':3,Closed:5};
   return progress(stages,states[item.status] ?? 0,t('Work order progress','Avancement de l’ordre de travail'));
 }
 function progress(stages,current,title) {
@@ -139,7 +141,7 @@ function progress(stages,current,title) {
 }
 function requestProgress(item) {
   const work=db.workOrders.find(w=>w.requestId===item.id);
-  const current=item.status==='Closed'?6:work && ['Planned','In progress','Waiting for parts'].includes(work.status)?4:item.status==='Approved'?3:['Approval review','Responsible review','HSE review'].includes(item.status)?2:1;
+  const current=flow.interventionProgressStep(item,work);
   return progress([t('Request','Demande'),t('Assessment','Analyse'),t('Approvals','Approbations'),t('Work order','Ordre de travail'),t('Work','Travaux'),t('Completed','Terminée')],current,t('Intervention progress','Avancement de l’intervention'));
 }
 const wizardNames={
