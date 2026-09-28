@@ -256,7 +256,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:540px){.overview-layout .queue-row{display:grid;grid-template-columns:1fr auto;gap:8px}.overview-layout .queue-id{width:auto}.overview-layout .queue-main{grid-column:1/-1;grid-row:2;min-width:0}.overview-layout .queue-status{grid-column:2;grid-row:1;padding:0;max-width:none}}
 @media(max-width:780px){.topbar .search{width:auto;min-width:0}.top-actions{flex:1}.role-chip{max-width:130px}}
 @media(max-width:540px){.topbar .search{width:90px}.top-actions .role-chip{max-width:95px}}
-@media(max-width:1000px){
+@media(max-width:1100px){
   .table-wrap{overflow:visible;border:0;background:transparent;box-shadow:none}
   .table-wrap table,.table-wrap tbody{display:block;min-width:0;width:100%}
   .table-wrap thead{display:none}
