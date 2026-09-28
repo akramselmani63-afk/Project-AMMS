@@ -19,3 +19,9 @@ export async function readPhotos(files) {
   }
   return result;
 }
+export async function readProforma(file) {
+  if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Use a PDF, JPG, PNG or WebP proforma. / Utilisez un proforma PDF, JPG, PNG ou WebP.');
+  if(file.size>8*1024*1024) throw new Error('Proforma must be under 8 MB. / Le proforma doit faire moins de 8 Mo.');
+  if(file.type!=='application/pdf') return {...(await readPhotos([file]))[0],name:file.name.replace(/\.[^.]+$/,'')+'.jpg'};
+  return {name:file.name,data:await new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.onerror=()=>reject(reader.error); reader.readAsDataURL(file); })};
+}
