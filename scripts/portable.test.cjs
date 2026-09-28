@@ -27,6 +27,7 @@ test('portable file opens records from every list', async () => {
   });
   vm.runInContext(script, context);
   const workspace = vm.runInContext('workflow.seed()', context);
+  workspace.actor = 'Akram Selmani';
   workspace.partRequests.push({ id: 'SP-TEST', title: 'Test part', equipmentId: workspace.equipment[0].id, status: 'Purchasing', reference: 'REF-1', quantity: 1, unit: 'pcs', acceptedQuantity: 0, rejectedQuantity: 0, deliveries: [], photos: [] });
   saved = JSON.stringify(workspace);
   await new Promise(resolve => setImmediate(resolve));
@@ -58,6 +59,7 @@ test('portable file opens records from every list', async () => {
   assert.match(app.innerHTML, /profile-hero/, 'facepile opens a role profile');
   await click('data-page', 'Work');
   await click('data-page', 'Profile');
-  assert.match(app.innerHTML, /profile-layout/, 'profile navigation opens the current user profile');
+  assert.match(app.innerHTML, /profile-avatar">AS<\/span>/, 'profile uses first and last name initials');
+  assert.doesNotMatch(app.innerHTML, /Ordres de travail affectés à ce rôle/, 'profile omits work orders');
 });
 
