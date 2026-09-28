@@ -2,9 +2,17 @@
 
 Responsive French/English CMMS prototype for AGRIDIAM's maintenance team. No application dependencies or paid services are required. AGRIDIAM's supplied logo and blue/green identity are retained.
 
+The opening screen now shows email/password sign-in and account creation layouts for the planned company server. These forms do not create or verify accounts yet. **Open demo without an account** enters the local prototype with a chosen name and role; the selected role is only a workflow preview. Passwords entered in the account forms are not saved or sent. The operations dashboard shows active work, pending safety/approval, PM due within seven days, completed-work downtime over 30 days and priority distribution. The navigation button collapses the desktop rail or opens a closable mobile drawer. New parts requests use a three-step form, and their records show purchasing progress.
+
 ## Run locally
 
 For a one-person offline prototype review, send `AMMS-Prototype.html` alone. The recipient can double-click it in a modern desktop browser; no Node.js or server is needed. Run `npm run portable` to regenerate that file after changing the app. Its records stay in the recipient's browser and are separate from yours. Browser storage for local files varies, so the recipient should export a backup before clearing browser data or moving the file. This portable copy is for workflow testing, not shared operational use.
+
+For a click-to-open Windows app window, run `npm run package:windows` and send `dist/AMMS.exe`. It opens AMMS without browser tabs or an address bar and stores Edge's app data profile in `Documents/AMMS` on that PC. Microsoft Edge must be installed on the recipient's PC; this lightweight launcher uses Edge's app window mode rather than bundling a separate browser runtime.
+
+## Android phone app
+
+AMMS is also installable on Android as a Progressive Web App (PWA): the phone layout has a bottom navigation bar, touch-sized controls, offline app-shell caching, and the AMMS home-screen icon. Host this app on an HTTPS URL, open that URL in Android Chrome, then choose **Install app** (or **Add to Home screen**). Opening the local HTML file directly will not install it. This is an installable web app, not a native APK; its browser data is separate from the Windows executable's data.
 
 Requires Node.js 20 or later. Download the feature branch containing this version, extract the ZIP, and run from its folder:
 
@@ -77,9 +85,3 @@ Automated tests cover role gates, Engineer site-risk submission, HSE review, bot
 ## Prototype boundary
 
 No shared server database, real accounts, protected audit log, remote notifications, automatic content translation or digital signatures are configured. Finalized records are read-only through this UI. This version is for workflow review on one browser; operational deployment still requires server-side authorization, shared storage/backups and AGRIDIAM validation of procedures and source data.
-
-
-
-## Android APK
-
-The `android` module wraps the offline AMMS page in an Android WebView and provides phone navigation, photo selection, printing and backup export. On an open pull request to `main`, GitHub Actions builds an installable debug APK and attaches it as the `AMMS-Android-APK` workflow artifact. Download and unzip that artifact to install `app-debug.apk) on an Android test phone. Records are stored locally on that device and do not sync with Windows or other phones.
