@@ -68,7 +68,7 @@ test('v4 migration renames purchasing role and routes pending direct orders thro
   const r={id:'IR-900',title:'Legacy direct',equipmentId:'EQ-140',status:'HSE review',priority:'P3',issuedByResponsible:true,approval:{actor:'Responsible'},risks:[],history:[]};
   const w={id:'WO-900',title:r.title,equipmentId:r.equipmentId,requestId:r.id,status:'Awaiting approval',participants:['Maintenance Responsible'],history:[]};
   db.requests.unshift(r); db.workOrders.unshift(w); f.migrate(db);
-  assert.equal(db.schemaVersion,6); assert.equal(db.role,'Purchasing Department'); assert.equal(r.status,'Site risk assessment'); assert.equal(w.status,'Awaiting risk assessment'); assert.ok(w.participants.includes('Maintenance Engineer'));
+  assert.equal(db.schemaVersion,7); assert.equal(db.role,'Purchasing Department'); assert.equal(r.status,'Site risk assessment'); assert.equal(w.status,'Awaiting risk assessment'); assert.ok(w.participants.includes('Maintenance Engineer'));
 });
 for(const participants of [['Maintenance Engineer'],['Maintenance Responsible'],['Maintenance Engineer','Maintenance Responsible']]) test('completion closes work for '+participants.join(' + ')+' with paper signatures',()=>{
   const db=f.seed(),w=approved(db,participants); db.role=participants[0];
@@ -89,6 +89,16 @@ test('Responsible part requests go directly to purchasing; all narrative fields 
   const report=f.addReport(db,{date:f.today(),shift:'Day'}); assert.equal(report.summary,'');
   db.role='Maintenance Responsible'; f.approveReport(db,report.id,{}); assert.equal(report.status,'Approved');
 });
+test('v6 saved part requests gain missing delivery fields without losing their data',()=>{
+  const db=f.seed(); db.schemaVersion=6;
+  const part={id:'SPR-001',title:'Existing bearing',reference:'B-01',status:'Purchasing',quantity:2};
+  db.partRequests=[part]; f.migrate(db);
+  assert.equal(db.schemaVersion,7);
+  assert.deepEqual(part.deliveries,[]);
+  assert.deepEqual(part.photos,[]);
+  assert.equal(part.acceptedQuantity,0);
+  assert.equal(part.title,'Existing bearing');
+});
 test('purchase order keeps a PDF proforma and rejects unsafe attachments',()=>{
   const db=f.seed(); db.role='Maintenance Responsible';
   const p=f.addPartRequest(db,{title:'Bearing',reference:'TEST-02',equipmentId:'EQ-140',quantity:1,neededBy:f.today()});
@@ -102,7 +112,7 @@ test('v3 migration preserves approvals and data while exposing both reviewers',(
   const db=f.seed(); db.schemaVersion=3;
   const a=db.requests[0],b=db.requests[1]; a.status='Responsible review'; a.photos=[{name:'keep.jpg'}];
   b.status='HSE review'; b.approval={actor:'Existing Responsible',at:'2026-09-21'};
-  f.migrate(db); assert.equal(db.schemaVersion,6); assert.equal(a.status,'Approval review'); assert.equal(a.photos[0].name,'keep.jpg');
+  f.migrate(db); assert.equal(db.schemaVersion,7); assert.equal(a.status,'Approval review'); assert.equal(a.photos[0].name,'keep.jpg');
   assert.equal(b.status,'HSE review'); assert.equal(b.approval.actor,'Existing Responsible');
   assert.equal(f.canReviewRequest('HSE',a),true); assert.equal(f.canReviewRequest('Maintenance Responsible',a),true);
 });
