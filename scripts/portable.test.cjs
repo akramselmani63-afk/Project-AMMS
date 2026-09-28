@@ -44,6 +44,7 @@ test('portable file opens records from every list', async () => {
   await open('Requests', 'open', 'requests');
   await open('Work', 'open', 'workOrders');
   await open('Parts', 'open', 'partRequests');
+  await open('Preventive', 'open', 'preventive');
   await open('Reports', 'open-report-intervention', 'workOrders');
   await click('data-page', 'Reports');
   await click('data-report-tab', 'shift');
