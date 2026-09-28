@@ -37,7 +37,8 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
-  if (db.schemaVersion >= 7) return db;
+  if (db.schemaVersion >= 8) return db;
+  if (db.schemaVersion >= 7) return migrateApprovedWork(db);
   if (db.schemaVersion >= 6) return migrateParts(db);
   if (db.schemaVersion >= 5) return migratePaperClosure(db);
   if (db.schemaVersion >= 4) return migrateSiteAssessment(db);
@@ -102,7 +103,11 @@ function migrateParts(db) {
     p.acceptedQuantity ??= 0;
     p.rejectedQuantity ??= 0;
   }
-  db.schemaVersion=7; return db;
+  db.schemaVersion=7; return migrateApprovedWork(db);
+}
+function migrateApprovedWork(db) {
+  for(const r of db.requests) if(r.status==='Approved' && !db.workOrders.some(w=>w.requestId===r.id)) addApprovedWork(db,r);
+  db.schemaVersion=8; return db;
 }
 export function canReviewRequest(role,r) {
   return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
@@ -120,7 +125,11 @@ export function assess(db,id,v) {
   requireValue(['P1','P2','P3','P4'].includes(v.priority),'Select priority.');
   Object.assign(r,{priority:v.priority,diagnosis:optional(v,'diagnosis'),risks:v.risks || [],status:'Approval review'});
   delete r.approval; delete r.hseApproval; delete r.precautions; audit(db,r,'Assessed',r.diagnosis);
-  if(db.role==='Maintenance Responsible') r.approval=audit(db,r,'Responsible approval');
+  if(db.role==='Maintenance Responsible') {
+    r.workParticipants=maintenanceParticipants(v.participants);
+    r.workDueDate=optional(v,'dueDate') || today();
+    r.approval=audit(db,r,'Responsible approval');
+  }
   r.status=approvalStatus(r);
 }
 export function reviewRequest(db,id,decision,v={}) {
@@ -131,12 +140,32 @@ export function reviewRequest(db,id,decision,v={}) {
   if(decision!=='approve') {
     r.status=decision==='return'?'Returned':'Rejected';
     delete r.approval; delete r.hseApproval; delete r.precautions;
+    delete r.workParticipants; delete r.workDueDate;
     audit(db,r,r.status,note); return;
   }
-  if(db.role==='Maintenance Responsible') r.approval=audit(db,r,'Responsible approval',note);
+  if(db.role==='Maintenance Responsible') {
+    r.workParticipants=maintenanceParticipants(v.participants);
+    r.workDueDate=optional(v,'dueDate') || today();
+    r.approval=audit(db,r,'Responsible approval',note);
+  }
   else { r.precautions=note; r.hseApproval=audit(db,r,'HSE approval',note); }
   r.status=approvalStatus(r);
-  if(r.status==='Approved') for(const w of db.workOrders.filter(w=>w.requestId===id && w.status==='Awaiting approval')) w.status='Planned';
+  if(r.status==='Approved') {
+    const linked=db.workOrders.filter(w=>w.requestId===id);
+    if(!linked.length) addApprovedWork(db,r);
+    for(const w of linked) if(w.status==='Awaiting approval') w.status='Planned';
+  }
+}
+function maintenanceParticipants(values) {
+  const participants=values == null?['Maintenance Engineer']:values;
+  requireValue(Array.isArray(participants) && participants.length && participants.every(role=>maintenance.includes(role)),'Select maintenance participants.');
+  return [...new Set(participants)];
+}
+function addApprovedWork(db,r) {
+  const w={id:nextId(db.workOrders,'WO'),title:r.title,equipmentId:r.equipmentId,requestId:r.id,pmId:r.pmId || null,type:r.pmId?'Preventive':'Corrective',priority:r.priority || 'P3',status:'Planned',dueDate:r.workDueDate || today(),participants:maintenanceParticipants(r.workParticipants),external:'',notes:'',history:[]};
+  db.workOrders.unshift(w);
+  w.history.push({at:now(),role:'Maintenance Responsible',actor:r.approval?.actor || 'Maintenance Responsible',action:'Work planned',note:''});
+  return w;
 }
 export function createWork(db,id,v) {
   allow(db,'work'); const r=record(db,'requests',id); stage(r,...(db.role==='Maintenance Responsible'?[...reviewStages,'Approved']:['Approved']));
@@ -288,8 +317,8 @@ export function interventionReports(db) {
 }
 export function approveReport(db,id,v) { allow(db,'approve'); const r=record(db,'reports',id); stage(r,'Draft'); r.approval=audit(db,r,'Report approved',optional(v,'note')); r.status='Approved'; }
 export function interventionProgressStep(request,work) {
-  if(request.status==='Closed' || work?.status==='Closed') return 6;
-  if(work && ['Planned','In progress','Waiting for parts'].includes(work.status)) return 4;
+  if(request.status==='Closed' || work?.status==='Closed') return 5;
+  if(work && ['Planned','In progress','Waiting for parts'].includes(work.status)) return 3;
   if(work || request.status==='Approved') return 3;
   if(['Approval review','Responsible review','HSE review'].includes(request.status)) return 2;
   return 1;
