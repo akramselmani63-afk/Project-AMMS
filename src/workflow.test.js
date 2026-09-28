@@ -11,6 +11,26 @@ function approved(db,participants=['Maintenance Engineer']) {
   db.role='Maintenance Engineer'; return db.workOrders.find(w=>w.requestId===r.id);
 }
 const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
+test('requester or maintenance can remove only an unstarted, unreferenced intervention',()=>{
+  const db=f.seed(); db.role='Employee'; db.actor='Amina';
+  const own=request(db); assert.equal(f.canRemoveIntervention(db,own),true);
+  db.actor='Other employee'; assert.equal(f.canRemoveIntervention(db,own),false);
+  assert.throws(()=>f.removeIntervention(db,own.id),/cannot be removed/);
+  db.actor='Amina'; f.removeIntervention(db,own.id); assert.equal(db.requests.some(r=>r.id===own.id),false);
+  const linked=request(db); db.actor='Engineer'; db.role='Maintenance Engineer'; f.assess(db,linked.id,{priority:'P2'});
+  db.role='Maintenance Responsible'; f.reviewRequest(db,linked.id,'approve',{});
+  db.role='HSE'; f.reviewRequest(db,linked.id,'approve',{});
+  const work=db.workOrders.find(w=>w.requestId===linked.id); assert.ok(work);
+  db.role='Maintenance Engineer'; assert.equal(f.canRemoveIntervention(db,linked),true);
+  const part=f.addPartRequest(db,{title:'Bearing',reference:'B-1',quantity:1,neededBy:f.today(),equipmentId:work.equipmentId,workOrderId:work.id});
+  assert.equal(f.canRemoveIntervention(db,linked),false);
+  db.partRequests=db.partRequests.filter(p=>p.id!==part.id); work.status='Planned';
+  const report=f.addReport(db,{date:f.localDay(linked.createdAt),shift:'Day'});
+  assert.equal(f.canRemoveIntervention(db,linked),false);
+  db.reports=db.reports.filter(r=>r.id!==report.id);
+  assert.equal(f.canRemoveIntervention(db,linked),true);
+  f.removeIntervention(db,linked.id); assert.equal(db.workOrders.some(w=>w.id===work.id),false);
+});
 test('linked request and work order share intervention progress',()=>{
   const r={status:'Submitted'},w={status:'Awaiting risk assessment'};
   assert.equal(f.interventionProgressStep(r),1);
