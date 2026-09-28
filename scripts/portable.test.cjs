@@ -52,5 +52,12 @@ test('portable file opens records from every list', async () => {
   assert.ok(shift, 'shift report has an Open button');
   await listeners.click({ target: { closest: selector => selector === '[data-action]' ? { dataset: { action: 'open', id: `reports:${shift}` } } : null } });
   assert.match(app.innerHTML, /record-navigation/, 'shift report opens its detail');
+  await click('data-page', 'Work');
+  assert.match(app.innerHTML, /data-action="profile-role"/, 'work orders show assigned role avatars');
+  await listeners.click({ target: { closest: selector => selector === '[data-action]' ? { dataset: { action: 'profile-role', id: 'Maintenance Engineer' } } : null } });
+  assert.match(app.innerHTML, /profile-hero/, 'facepile opens a role profile');
+  await click('data-page', 'Work');
+  await click('data-page', 'Profile');
+  assert.match(app.innerHTML, /profile-layout/, 'profile navigation opens the current user profile');
 });
 
