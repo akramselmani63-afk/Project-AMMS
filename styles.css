@@ -223,6 +223,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* Compact desktop rail expands over the workspace while hovered or keyboard focused. */
 .brand-mini{display:none}
 .attachment-link a{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid var(--amms-line);border-radius:7px;color:var(--amms-blue);font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.record-navigation{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .purchase-progress{grid-template-columns:repeat(var(--stage-count,5),minmax(0,1fr))}
 @media(min-width:781px){
   .sidebar{width:70px;overflow:hidden;box-shadow:4px 0 14px #0a305714}
