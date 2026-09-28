@@ -180,13 +180,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .overview-side .mini-row>div{flex:1;min-width:150px}
 .overview-side .mini-row .badge{align-self:center}
 .pulse-panel .panel-head{margin-bottom:8px}
-.priority-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-.priority-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;color:#405e72;font-size:14px;font-variant-numeric:tabular-nums}
-.priority-row>span{font-weight:700}
-.priority-track{grid-column:1/-1;height:9px;border-radius:5px;background:#e8f0f5;overflow:hidden}
-.priority-track span{display:block;height:100%;border-radius:5px;background:var(--amms-green)}
-.priority-row:first-child .priority-track span{background:#bb5749}
-.priority-row:nth-child(2) .priority-track span{background:#df9851}
+.priority-chart{display:flex;align-items:center;justify-content:center;gap:clamp(20px,5vw,56px);padding:14px 8px 4px}
+.priority-donut{position:relative;display:grid;place-items:center;flex:none;width:174px;aspect-ratio:1;border-radius:50%}
+.priority-donut::before{content:'';position:absolute;inset:28px;border-radius:50%;background:#fff}
+.priority-donut-center{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1.1;color:var(--amms-ink)}
+.priority-donut-center strong{font-size:39px;font-variant-numeric:tabular-nums}
+.priority-donut-center span{margin-top:4px;color:#61798b;font-size:12px;font-weight:700}
+.priority-legend{display:grid;gap:12px;min-width:120px;width:min(210px,100%)}
+.priority-legend-row{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;color:#405e72;font-size:14px;font-variant-numeric:tabular-nums}
+.priority-legend-row>span:last-child{font-weight:700}
+.priority-dot{width:11px;height:11px;border-radius:50%}
+@media(max-width:540px){.priority-chart{gap:20px}.priority-donut{width:min(44vw,156px)}.priority-donut::before{inset:24px}.priority-donut-center strong{font-size:34px}.priority-legend{min-width:105px}}
 @media(max-width:1100px){.overview-stats .stat:nth-child(3){border-left:0}.overview-stats .stat:nth-child(n+3){border-top:1px solid #e5ecf0}}
 .purchase-progress{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:12px 0 24px}
 .purchase-stage{display:flex;align-items:center;gap:6px;min-width:0;color:#637f90;font-size:11px}
