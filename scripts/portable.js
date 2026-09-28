@@ -29,7 +29,7 @@ const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: s
   'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
   'addRequest', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
   'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'addPM',
-  'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'statusMatches'
+  'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
 const photos = await source('src/photos.js', '', ['MAX_PHOTOS', 'validatePhotos', 'readPhotos', 'readProforma']);
 const indexed = await source('src/storage.js', 'const {load, migrate} = workflow;', ['readWorkspace', 'writeWorkspace']);
