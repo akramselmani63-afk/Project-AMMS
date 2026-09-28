@@ -37,7 +37,8 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
-  if (db.schemaVersion >= 6) return db;
+  if (db.schemaVersion >= 7) return db;
+  if (db.schemaVersion >= 6) return migrateParts(db);
   if (db.schemaVersion >= 5) return migratePaperClosure(db);
   if (db.schemaVersion >= 4) return migrateSiteAssessment(db);
   if (db.schemaVersion >= 3) return migrateApprovals(db);
@@ -89,7 +90,19 @@ function migratePaperClosure(db) {
     w.status='Closed';
     const r=db.requests.find(r=>r.id===w.requestId); if(r) r.status='Closed';
   }
-  db.schemaVersion=6; return db;
+  db.schemaVersion=6; return migrateParts(db);
+}
+function migrateParts(db) {
+  db.partRequests ||= [];
+  for (const p of db.partRequests) {
+    p.deliveries ||= [];
+    p.photos ||= [];
+    p.history ||= [];
+    p.receivedQuantity ??= 0;
+    p.acceptedQuantity ??= 0;
+    p.rejectedQuantity ??= 0;
+  }
+  db.schemaVersion=7; return db;
 }
 export function canReviewRequest(role,r) {
   return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
