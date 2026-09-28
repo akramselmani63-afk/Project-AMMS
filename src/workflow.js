@@ -274,6 +274,13 @@ export function interventionReports(db) {
   }).sort((a,b)=>String(b.at).localeCompare(String(a.at)) || b.id.localeCompare(a.id));
 }
 export function approveReport(db,id,v) { allow(db,'approve'); const r=record(db,'reports',id); stage(r,'Draft'); r.approval=audit(db,r,'Report approved',optional(v,'note')); r.status='Approved'; }
+export function interventionProgressStep(request,work) {
+  if(request.status==='Closed' || work?.status==='Closed') return 6;
+  if(work && ['Planned','In progress','Waiting for parts'].includes(work.status)) return 4;
+  if(work || request.status==='Approved') return 3;
+  if(['Approval review','Responsible review','HSE review'].includes(request.status)) return 2;
+  return 1;
+}
 export function statusMatches(item,filter) {
   if(filter==='All') return true;
   if(filter==='New') return item.status==='Submitted' || item.status==='New';
