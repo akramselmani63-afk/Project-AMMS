@@ -220,6 +220,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:1150px){.overview-layout{grid-template-columns:1fr 1fr}.work-panel{grid-column:1/-1}.overview-side{grid-column:1/-1;grid-template-columns:1fr 1fr}}
 @media(max-width:780px){.sidebar{width:min(300px,84vw);transform:translateX(-100%);box-shadow:12px 0 32px #09294936}.sidebar.open{transform:translateX(0)}.sidebar-collapsed .sidebar{width:min(300px,84vw)}.sidebar-collapsed .workspace-label,.sidebar-collapsed .nav-label,.sidebar-collapsed .sidebar-foot{display:block}.sidebar-collapsed .sidebar nav{padding:0 11px 14px}.sidebar-collapsed .nav-item{justify-content:flex-start}.sidebar-collapsed .brand{padding:7px 17px}.sidebar-collapsed .brand-logo{width:210px;object-fit:contain}.drawer-scrim.visible{display:block;position:fixed;inset:0;z-index:10;border:0;background:#0b254a80}.drawer-close{display:block;position:absolute;right:8px;top:23px;border:0;background:#edf4f8;color:var(--amms-blue);border-radius:6px;font-size:22px;width:30px;height:30px}.topbar{padding:0 16px}.signout-button{display:none}.overview-layout{grid-template-columns:1fr}.overview-side{grid-column:auto;grid-template-columns:1fr}.overview-heading{align-items:flex-start;flex-direction:column}.overview-actions{width:100%}.overview-actions .button{flex:1}.signin-screen{grid-template-columns:1fr}.signin-aside{min-height:230px;padding:24px 26px}.signin-aside>img{width:190px;max-height:70px}.signin-aside h1{font-size:28px;margin:16px 0 5px;max-width:none}.signin-aside p{font-size:12px;margin:0}.signin-aside>span{display:none}.signin-main{padding:20px}.signin-card{padding:24px}.purchase-progress{gap:2px}.purchase-stage{flex-direction:column;text-align:center;font-size:9px}.purchase-stage strong{overflow-wrap:anywhere}}
 @media(max-width:540px){.overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-stats .stat{min-height:113px;padding:15px}.overview-stats .stat-number{font-size:29px}.overview-layout .panel{padding:18px}.overview-layout .queue{margin:0 -18px -18px}.overview-layout .queue-row{padding:13px 18px}.queue-status{max-width:100%;justify-content:flex-start;padding-left:76px}.overview-layout .panel-head{gap:8px}.overview-layout .text-button{font-size:10px}.wizard-panel{grid-template-columns:1fr}.wizard-panel .field.full{grid-column:auto}.wizard-step{font-size:10px;padding:8px 3px;gap:4px}.wizard-step b{width:20px;height:20px}.signin-aside{min-height:196px}.signin-card h2{font-size:22px}}
+/* Compact desktop rail expands over the workspace while hovered or keyboard focused. */
+.brand-mini{display:none}
+.attachment-link a{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid var(--amms-line);border-radius:7px;color:var(--amms-blue);font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.purchase-progress{grid-template-columns:repeat(var(--stage-count,5),minmax(0,1fr))}
+@media(min-width:781px){
+  .sidebar{width:70px;overflow:hidden;box-shadow:4px 0 14px #0a305714}
+  .sidebar:hover,.sidebar:focus-within{width:264px;margin-right:-194px;box-shadow:12px 0 28px #0a30572b}
+  .sidebar .brand{padding:7px;align-items:center;justify-content:center}
+  .sidebar .brand-logo{display:none}
+  .sidebar .brand-mini{display:block;width:54px;height:54px;object-fit:contain}
+  .sidebar .workspace-label,.sidebar .nav-label,.sidebar .sidebar-foot{display:none}
+  .sidebar nav{padding:17px 9px}
+  .sidebar .nav-item{justify-content:center;padding:10px}
+  .sidebar:hover .brand,.sidebar:focus-within .brand{padding:7px 17px}
+  .sidebar:hover .brand-logo,.sidebar:focus-within .brand-logo{display:block}
+  .sidebar:hover .brand-mini,.sidebar:focus-within .brand-mini{display:none}
+  .sidebar:hover .workspace-label,.sidebar:focus-within .workspace-label,.sidebar:hover .nav-label,.sidebar:focus-within .nav-label,.sidebar:hover .sidebar-foot,.sidebar:focus-within .sidebar-foot{display:flex}
+  .sidebar:hover .sidebar-foot,.sidebar:focus-within .sidebar-foot{display:block}
+  .sidebar:hover nav,.sidebar:focus-within nav{padding:0 11px 14px}
+  .sidebar:hover .nav-item,.sidebar:focus-within .nav-item{justify-content:flex-start;padding:8px 12px}
+  .menu-button{display:none}
+}
+@media(max-width:780px){.brand-mini{display:none}.brand-logo{display:block}}
 @media print{.signin-screen{display:none!important}}
 @media(max-width:1100px){.topbar .breadcrumb{display:none}.topbar .search{min-width:0;width:clamp(120px,21vw,210px)}.top-actions{min-width:0}.role-chip{max-width:135px}.overview-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.overview-side{grid-template-columns:1fr}.overview-layout{grid-template-columns:1fr}.work-panel{grid-column:auto}}
