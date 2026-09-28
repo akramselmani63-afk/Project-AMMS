@@ -367,3 +367,8 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .linked-work{margin-top:22px;padding:18px;border:1px solid #d9e8e1;border-radius:10px;background:#f8fcfa}
 .linked-work h3{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0}
 @media(max-width:540px){.choice-grid{grid-template-columns:1fr}.choice-card{min-height:0}}
+.record-filters{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 18px;padding:16px;border:1px solid #dce7eb;border-radius:10px;background:#fff}
+.record-filters label{display:flex;flex:1 1 190px;min-width:0;flex-direction:column;gap:6px;color:#486373;font-size:13px;font-weight:700}
+.record-filters select,.record-filters input{width:100%;min-height:42px;padding:8px 11px;border:1px solid #cbdce5;border-radius:7px;background:#fff;color:#193c58;font-size:14px}
+.button.danger{border-color:#d9aaaa;background:#fff;color:#a32b2b}
+.button.danger:hover{background:#fff1f1}
