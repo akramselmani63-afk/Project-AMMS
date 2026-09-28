@@ -117,8 +117,25 @@ export const seed = () => migrate(seedBase());
 export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
-  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:required(v,'reportedBy'),createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
+  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:required(v,'reportedBy'),createdBy:db.actor || db.role,createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
   audit(db,r,'Submitted'); db.requests.unshift(r); return r;
+}
+export function canRemoveIntervention(db,r) {
+  if(!r) return false;
+  const actor=String(db.actor || '').trim();
+  const requester=actor && actor===(r.createdBy || r.reportedBy);
+  if(!requester && !maintenance.includes(db.role)) return false;
+  const linked=db.workOrders.filter(w=>w.requestId===r.id);
+  if(r.status==='Closed' || linked.some(w=>w.startedAt || ['In progress','Waiting for parts','Closed'].includes(w.status))) return false;
+  if(db.partRequests.some(p=>linked.some(w=>w.id===p.workOrderId))) return false;
+  if(db.reports.some(report=>report.linkedWorkOrderId && linked.some(w=>w.id===report.linkedWorkOrderId) || report.activities?.some(a=>a.requestId===r.id || linked.some(w=>w.id===a.workOrderId || w.id===a.id)))) return false;
+  return true;
+}
+export function removeIntervention(db,id) {
+  const r=record(db,'requests',id);
+  requireValue(canRemoveIntervention(db,r),'This intervention cannot be removed by this user or after linked work, parts, or reports. / Cette intervention ne peut pas être supprimée par cet utilisateur ou après des travaux, pièces ou rapports liés.');
+  db.workOrders=db.workOrders.filter(w=>w.requestId!==id);
+  db.requests=db.requests.filter(item=>item.id!==id);
 }
 export function assess(db,id,v) {
   allow(db,'assess'); const r=record(db,'requests',id); stage(r,'Submitted','Returned');
@@ -326,7 +343,8 @@ export function interventionProgressStep(request,work) {
 export function statusMatches(item,filter) {
   if(filter==='All') return true;
   if(filter==='New') return item.status==='Submitted' || item.status==='New';
-  if(filter==='Pending reviews') return ['Site risk assessment','Approval review','Responsible review','HSE review'].includes(item.status);
+  if(filter==='Pending reviews') return ['Site risk assessment','Approval review','Responsible review','HSE review','Awaiting risk assessment','Awaiting approval'].includes(item.status);
+  if(filter==='Approved') return ['Approved','Planned'].includes(item.status);
   if(filter==='Closed') return ['Closed','Legacy completed'].includes(item.status);
   return item.status===filter;
 }
