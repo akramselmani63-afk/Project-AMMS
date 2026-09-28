@@ -57,6 +57,8 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 
 Planning is a maintenance responsibility, not a separate user role. All narrative notes/comments are optional; identifiers, selections and quantities still receive validation. The operational-check/witness field has been removed. All demo roles can read records. The role switcher simulates permissions; it is **not authentication or a secure access boundary**. Names and role events in the history are not digital signatures.
 
+Work orders show a facepile of assigned maintenance roles. Selecting an avatar or the profile control opens a demo profile with role permissions and linked work. Profiles are role previews; other people's names and emails are not inferred or stored.
+
 The earlier dashboard arrangement is restored: four counters, priority work, upcoming preventive schedule, new requests and purchasing attention. Status tabs with counts are restored for requests, work orders, purchasing and reports. Only Priority is shown in forms, details and printouts; historical severity values are retained in old records without being used.
 
 ## Persistence and migration
@@ -85,3 +87,4 @@ Automated tests cover role gates, Engineer site-risk submission, HSE review, bot
 ## Prototype boundary
 
 No shared server database, real accounts, protected audit log, remote notifications, automatic content translation or digital signatures are configured. Finalized records are read-only through this UI. This version is for workflow review on one browser; operational deployment still requires server-side authorization, shared storage/backups and AGRIDIAM validation of procedures and source data.
+
