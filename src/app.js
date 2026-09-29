@@ -52,17 +52,19 @@ async function flushPending() {
   finally { syncing=false; }
 }
 async function checkServerChanges() {
-  if(!serverMode || !signedIn || refreshing || syncing || busy || dialog || pendingCommands.length || document.hidden || document.activeElement?.matches('input,textarea,select,[contenteditable]')) return;
+  if(!serverMode || !signedIn || refreshing || syncing || busy || dialog || pendingCommands.length || document.hidden) return;
   refreshing=true;
   try {
     const {revision}=await serverRequest('revision');
     if(revision<=(db.revision || 0)) return;
     const result=await serverRequest('workspace');
-    if(!signedIn || syncing || busy || dialog || pendingCommands.length || document.hidden || document.activeElement?.matches('input,textarea,select,[contenteditable]') || result.user.email!==serverEmail || result.workspace.revision<=(db.revision || 0)) return;
+    if(!signedIn || syncing || busy || dialog || pendingCommands.length || document.hidden || result.user.email!==serverEmail || result.workspace.revision<=(db.revision || 0)) return;
+    const search=document.activeElement?.id==='search'?{start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd}:null;
     const language=db.language;
     db=result.workspace; db.language=language;
     await writeServerCache({email:serverEmail,workspace:db,queue:[]});
     render();
+    if(search) { const input=document.querySelector('#search'); input?.focus(); input?.setSelectionRange(search.start,search.end); }
   } catch {} finally { refreshing=false; }
 }
 globalThis.setInterval?.(checkServerChanges,5000);
