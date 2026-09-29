@@ -2,7 +2,32 @@
 
 Responsive French/English CMMS prototype for AGRIDIAM's maintenance team. No application dependencies or paid services are required. AGRIDIAM's supplied logo and blue/green identity are retained.
 
-The opening screen now shows email/password sign-in and account creation layouts for the planned company server. These forms do not create or verify accounts yet. **Open demo without an account** enters the local prototype with a chosen name and role; the selected role is only a workflow preview. Passwords entered in the account forms are not saved or sent. The operations dashboard shows active work, pending safety/approval, PM due within seven days, completed-work downtime over 30 days and priority distribution. The navigation button collapses the desktop rail or opens a closable mobile drawer. New parts requests use a three-step form, and their records show purchasing progress.
+AMMS has two modes. The portable file and default local server remain a single-device demo with role switching. Company server mode adds provisioned email/password accounts, shared records, server-checked workflow permissions and an offline submission queue. The operations dashboard shows active work, pending safety/approval, PM due within seven days, completed-work downtime over 30 days and priority distribution.
+
+## Company server preparation
+
+The app server is included now; its address and environment settings can be supplied after IT confirms the host. It needs Node.js 20+, a persistent private data directory, backups, and an HTTPS reverse proxy for access from other devices. Keep it in its own VM or service environment, separate from MES/SCADA. Build before starting it:
+
+```powershell
+$env:AMMS_MODE = 'server'
+$env:AMMS_EMAIL_DOMAIN = 'company.example'
+$env:AMMS_DATA_DIR = 'D:\AMMS-Data'
+$env:AMMS_PUBLIC_URL = 'https://amms.company.example'
+$env:HOST = '127.0.0.1'
+$env:PORT = '4173'
+npm run build
+node server.js
+```
+
+IT provisions each person's email, name and role. This prints a one-time activation code to give privately to that person; the person enters it when creating a password in AMMS. Provisioning also changes an existing user's role without resetting their password:
+
+```powershell
+node scripts/provision-user.js 'person@company.example' 'Person Name' 'Maintenance Engineer'
+```
+
+Allowed roles are Employee, Maintenance Engineer, Maintenance Responsible, HSE, Purchasing Department and Developer Admin. Passwords are salted and hashed on the server. The server keeps account cookies for eight hours; restarting the service signs users out. Company data and account files stay in `AMMS_DATA_DIR`, outside the public app files. Back up that directory while the service is stopped or from a filesystem snapshot. Do not put it in a web-served folder. The server binds to localhost by default; IT must configure the HTTPS proxy, DNS, firewall and service startup. Set `AMMS_PUBLIC_URL` to the final HTTPS address so cookies use the Secure flag.
+
+Users must sign in while connected. If the connection drops afterward, the app keeps its cached workspace and queues submissions on that device. It sends them in order when the server becomes reachable. A conflicting submission remains queued and needs review; it is not silently discarded. Queued data, including photos, stays in that browser's IndexedDB, so do not clear browser data before it syncs. The portable HTML and older local records are **not** automatically imported into the shared server. Validate the equipment list and plan any import with IT before operational use.
 
 ## Run locally
 
@@ -12,7 +37,7 @@ For a click-to-open Windows app window, run `npm run package:windows` and send `
 
 ## Android phone app
 
-AMMS is also installable on Android as a Progressive Web App (PWA): the phone layout has a bottom navigation bar, touch-sized controls, offline app-shell caching, and the AMMS home-screen icon. Host this app on an HTTPS URL, open that URL in Android Chrome, then choose **Install app** (or **Add to Home screen**). Opening the local HTML file directly will not install it. This is an installable web app, not a native APK; its browser data is separate from the Windows executable's data.
+AMMS is also installable on Android as a Progressive Web App (PWA): the phone layout has a sliding navigation menu, touch-sized controls, offline app-shell caching, and the AMMS home-screen icon. Host the company server behind HTTPS, open that URL in Android Chrome, then choose **Install app** (or **Add to Home screen**). Opening the local HTML file directly will not install it. The existing APK/Windows portable builds remain local demos until they are pointed at the company server.
 
 Requires Node.js 20 or later. Download the feature branch containing this version, extract the ZIP, and run from its folder:
 
@@ -56,7 +81,7 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 | Purchasing Department | Supplier/quotation/order and delivery recording (French: Service achats) |
 | Developer Admin | Development/diagnostics; no operational approval powers |
 
-Planning is a maintenance responsibility, not a separate user role. All narrative notes/comments are optional; identifiers, selections and quantities still receive validation. The operational-check/witness field has been removed. All demo roles can read records. The role switcher simulates permissions; it is **not authentication or a secure access boundary**. Names and role events in the history are not digital signatures.
+Planning is a maintenance responsibility, not a separate user role. All narrative notes/comments are optional; identifiers, selections and quantities still receive validation. The operational-check/witness field has been removed. All roles can read records. In local demo mode the role switcher is only a preview; in company server mode IT assigns the role and the server checks it for every change. Names and role events in the history are not digital signatures.
 
 Interventions show a facepile of assigned maintenance roles. Selecting an avatar or the profile control opens a demo profile with role permissions. The current demo user's avatar uses their first and last name initials; unnamed role placeholders use role abbreviations. Profiles are role previews; other people's names and emails are not inferred or stored.
 
@@ -64,7 +89,7 @@ The earlier dashboard arrangement is restored: four counters, priority work, upc
 
 ## Persistence and migration
 
-Records and resized photos are stored together in a browser IndexedDB transaction. Failed saves leave the current in-memory records unchanged. A revision check prevents a stale browser tab from overwriting newer changes; reload when prompted. Export backup downloads all current records and embedded photos as JSON; restoration currently requires developer assistance.
+In demo mode, records and resized photos are stored together in a browser IndexedDB transaction. Failed saves leave the current in-memory records unchanged. A revision check prevents a stale browser tab from overwriting newer changes; reload when prompted. In company server mode, shared records are saved to the private server data directory, with offline submissions cached in browser IndexedDB. Export backup downloads visible records and embedded photos as JSON; restoration currently requires developer assistance.
 
 The previous `amms-demo-v1` localStorage record is read once and retained unchanged as a migration backup. Custom equipment and records, legacy stock records, and document metadata are preserved. Old open work orders return to recorded approval review because the previous prototype did not capture HSE authorization. Previous status is retained in `legacyStatus`. Legacy completed work stays historical. Standalone Documents and inventory screens are removed; equipment shows its existing document metadata.
 
@@ -79,12 +104,14 @@ New equipment appears beside its sibling machines in the hierarchy and in all eq
 
 - `src/data.js`: original sample data, source migration and hierarchy helpers
 - `src/workflow.js`: current schema migration, permissions, transition guards, purchasing and audit events
+- `src/commands.js`: common workflow command dispatch and stable IDs for offline replay
 - `src/storage.js`: atomic browser persistence and concurrent-tab detection
 - `src/photos.js`: input checks and image resizing
 - `src/app.js`: bilingual forms, lists, record details and print previews
+- `api.js`: company account and shared record API
 
 Automated tests cover role gates, Engineer site-risk submission, HSE review, both solo executors, Maintenance Responsible validation of joint work, partial/rejected/replacement deliveries, work waiting for parts, common equipment IDs, preventive closure, report snapshots, migration and photo limits. Browser checks cover attachment save/reload, intervention approval/execution, purchasing acceptance, central equipment selectors, print preview, and responsive layout.
 
 ## Prototype boundary
 
-No shared server database, real accounts, protected audit log, remote notifications, automatic content translation or digital signatures are configured. Finalized records are read-only through this UI. This version is for workflow review on one browser; operational deployment still requires server-side authorization, shared storage/backups and AGRIDIAM validation of procedures and source data.
+Company server mode includes shared file-backed records, real accounts and server-side workflow checks, but has no email verification, protected immutable audit log, remote notifications, automatic content translation or digital signatures. Finalized records are read-only through this UI. Before operational deployment, IT must set up HTTPS, access rules, service monitoring and backups, then test recovery and AGRIDIAM must validate the procedures and source data. The server's JSON storage is intended for the initial 20–25 user pilot; move to a transactional database if concurrent write volume or reporting needs grow.
