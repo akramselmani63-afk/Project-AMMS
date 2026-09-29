@@ -58,7 +58,7 @@ async function checkServerChanges() {
     const {revision}=await serverRequest('revision');
     if(revision<=(db.revision || 0)) return;
     const result=await serverRequest('workspace');
-    if(!signedIn || syncing || busy || dialog || pendingCommands.length || result.user.email!==serverEmail || result.workspace.revision<=(db.revision || 0)) return;
+    if(!signedIn || syncing || busy || dialog || pendingCommands.length || document.hidden || document.activeElement?.matches('input,textarea,select,[contenteditable]') || result.user.email!==serverEmail || result.workspace.revision<=(db.revision || 0)) return;
     const language=db.language;
     db=result.workspace; db.language=language;
     await writeServerCache({email:serverEmail,workspace:db,queue:[]});
