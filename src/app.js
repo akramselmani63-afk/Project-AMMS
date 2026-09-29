@@ -371,7 +371,7 @@ document.addEventListener('click',async e=>{
   const {action,id}=target.dataset;
   if(action==='menu') { drawerOpen=!drawerOpen; render(); (drawerOpen?document.querySelector('.drawer-close'):document.querySelector('.menu-button'))?.focus(); return; }
   if(action==='menu-close') { drawerOpen=false; render(); document.querySelector('.menu-button')?.focus(); return; }
-  if(action==='signout') { if(serverMode) await serverRequest('logout','POST',{}).catch(()=>{}); signedIn=false; try { sessionStorage.removeItem('amms-demo-session'); } catch {} render(); return; }
+  if(action==='signout') { if(serverMode) { try { await serverRequest('logout','POST',{}); } catch { flash(t('Connect to the server to sign out.','Reconnectez-vous au serveur pour vous déconnecter.')); return; } } signedIn=false; try { sessionStorage.removeItem('amms-demo-session'); } catch {} render(); return; }
   if(action==='auth-mode') { authMode=id; render(); return; }
   if(action==='retry-sync') { await flushPending(); return; }
   if(action==='choose-intervention') { dialog={type:db.role==='Maintenance Responsible'?'choose-intervention':'new-request'}; wizardStep=0; render(); return; }
