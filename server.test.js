@@ -46,6 +46,7 @@ test('company server shares records and enforces account roles',async()=>{
     const id=`IR-${'a'.repeat(32)}`, key='11111111-1111-4111-8111-111111111111';
     const command={type:'new-request',values:{title:'Test fault',equipmentId,reportedBy:'Test Employee'},created:{equipment:[],requests:[id],workOrders:[],preventive:[],partRequests:[],reports:[]},key};
     assert.equal((await request('/api/command','POST',command,employee)).status,200);
+    assert.equal((await request('/api/revision','GET',null,hse)).data.revision,1);
     assert.equal((await request('/api/command','POST',command,employee)).data.workspace.requests.filter(r=>r.id===id).length,1);
     assert.equal((await request('/api/command','POST',command,hse)).status,409);
     const shared=await request('/api/workspace','GET',null,hse);
