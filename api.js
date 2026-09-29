@@ -88,6 +88,7 @@ export async function api(req,res) {
     const user=userFor(req,users);
     if(!user) {send(res,401,{error:'Sign in required.'});return true;}
     if(req.method==='POST' && req.url==='/api/logout') {sessions.delete(cookie(req));send(res,200,{ok:true},{'set-cookie':'amms_session=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0'});return true;}
+    if(req.method==='GET' && req.url==='/api/revision') {send(res,200,{revision:(await workspace()).revision || 0});return true;}
     if(req.method==='GET' && req.url==='/api/workspace') {send(res,200,{workspace:view(await workspace(),user),user:{email:user.email,name:user.name,role:user.role}});return true;}
     if(req.method==='POST' && req.url==='/api/command') {
       const command=await body(req);
