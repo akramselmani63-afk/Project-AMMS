@@ -416,7 +416,7 @@ document.addEventListener('change',async e=>{
     finally { el.value=''; busy=false; }
     return;
   }
-  if(el.id==='language' || el.name==='role' || el.name==='actor') {
+  if(el.id==='language' || signedIn && (el.name==='role' || el.name==='actor')) {
     try { if(serverMode) { if(el.id==='language') { db.language=el.value; localStorage.setItem('amms-language',el.value); } } else await mutate(next=>{ if(el.id==='language') next.language=el.value; else next[el.name]=el.value; }); render(); } catch(err) { flash(errorText(err)); }
   }
   if(el.name==='workOrderId' && el.value) { const w=db.workOrders.find(w=>w.id===el.value); document.querySelector('[name=equipmentId]').value=w.equipmentId; }
