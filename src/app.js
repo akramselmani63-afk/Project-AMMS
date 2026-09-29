@@ -18,7 +18,7 @@ function finishSplash(immediate=false) {
   else setTimeout(reveal,Math.max(0,2750-(performance.now()-splashStarted)));
 }
 let db, page='Overview', query='', viewFilter='All', reportTab='interventions', priorityScope='open', filterEquipment='', filterPriority='', filterOrigin='', filterDate='', detail=null, dialog=null, pendingPhotos=[], pendingProforma=null, busy=false, signedIn=false, serverMode=false, drawerOpen=false, wizardStep=0, authMode='signin', profileRole=null, profileReturn=null;
-let serverEmail='', pendingCommands=[], syncing=false, queuedLast=false, syncError='';
+let serverEmail='', pendingCommands=[], syncing=false, refreshing=false, queuedLast=false, syncError='';
 try { signedIn=sessionStorage.getItem('amms-demo-session')==='1'; } catch {}
 async function serverRequest(path,method='GET',data) {
   const response=await fetch(`/api/${path}`,{method,credentials:'same-origin',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,cache:'no-store'});
@@ -51,6 +51,22 @@ async function flushPending() {
   } catch(err) { syncError=err instanceof TypeError?'':errorText(err); render(); if(syncError) flash(syncError); }
   finally { syncing=false; }
 }
+async function checkServerChanges() {
+  if(!serverMode || !signedIn || refreshing || syncing || busy || dialog || pendingCommands.length || document.hidden || document.activeElement?.matches('input,textarea,select,[contenteditable]')) return;
+  refreshing=true;
+  try {
+    const {revision}=await serverRequest('revision');
+    if(revision<=(db.revision || 0)) return;
+    const result=await serverRequest('workspace');
+    if(!signedIn || syncing || busy || dialog || pendingCommands.length || result.user.email!==serverEmail || result.workspace.revision<=(db.revision || 0)) return;
+    const language=db.language;
+    db=result.workspace; db.language=language;
+    await writeServerCache({email:serverEmail,workspace:db,queue:[]});
+    render();
+  } catch {} finally { refreshing=false; }
+}
+globalThis.setInterval?.(checkServerChanges,5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) checkServerChanges();});
 globalThis.addEventListener?.('online',()=>{render();flushPending();});
 globalThis.addEventListener?.('offline',()=>{if(serverMode && signedIn) render();});
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
