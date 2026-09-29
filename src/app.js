@@ -1,7 +1,8 @@
 import * as flow from './workflow.js';
 import { equipmentPath, sortedEquipment } from './data.js';
-import { readWorkspace, writeWorkspace } from './storage.js';
+import { readWorkspace, writeWorkspace, readServerCache, writeServerCache } from './storage.js';
 import { readPhotos, readProforma } from './photos.js';
+import { applyCommand, recordIds, assignCreated, newRecordIds } from './commands.js';
 
 const app=document.querySelector('#app');
 const splashStarted=performance.now();
@@ -16,8 +17,42 @@ function finishSplash(immediate=false) {
   if(immediate) reveal();
   else setTimeout(reveal,Math.max(0,2750-(performance.now()-splashStarted)));
 }
-let db, page='Overview', query='', viewFilter='All', reportTab='interventions', priorityScope='open', filterEquipment='', filterPriority='', filterOrigin='', filterDate='', detail=null, dialog=null, pendingPhotos=[], pendingProforma=null, busy=false, signedIn=false, drawerOpen=false, wizardStep=0, authMode='signin', profileRole=null, profileReturn=null;
+let db, page='Overview', query='', viewFilter='All', reportTab='interventions', priorityScope='open', filterEquipment='', filterPriority='', filterOrigin='', filterDate='', detail=null, dialog=null, pendingPhotos=[], pendingProforma=null, busy=false, signedIn=false, serverMode=false, drawerOpen=false, wizardStep=0, authMode='signin', profileRole=null, profileReturn=null;
+let serverEmail='', pendingCommands=[], syncing=false, queuedLast=false;
 try { signedIn=sessionStorage.getItem('amms-demo-session')==='1'; } catch {}
+async function serverRequest(path,method='GET',data) {
+  const response=await fetch(`/api/${path}`,{method,credentials:'same-origin',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,cache:'no-store'});
+  const result=await response.json();
+  if(!response.ok) { const error=new Error(result.error || 'Server request failed.'); error.status=response.status; throw error; }
+  return result;
+}
+async function refreshServer() {
+  const result=await serverRequest('workspace'); const language=db?.language || 'fr';
+  const cache=await readServerCache();
+  if(cache?.queue?.length && cache.email!==result.user.email) throw new Error(t('Another account has unsent changes on this device. Sign in with that account first.','Un autre compte a des modifications non envoyées sur cet appareil. Connectez-vous d’abord avec ce compte.'));
+  serverEmail=result.user.email; pendingCommands=cache?.email===serverEmail?cache.queue || []:[];
+  db=pendingCommands.length?cache.workspace:result.workspace; db.language=language; signedIn=true;
+  if(!pendingCommands.length) await writeServerCache({email:serverEmail,workspace:db,queue:[]});
+  else await flushPending();
+}
+async function flushPending() {
+  if(!serverMode || !signedIn || syncing || !pendingCommands.length) return;
+  syncing=true;
+  try {
+    while(pendingCommands.length) {
+      await serverRequest('command','POST',pendingCommands[0]);
+      pendingCommands.shift();
+      await writeServerCache({email:serverEmail,workspace:db,queue:pendingCommands});
+    }
+    const language=db.language;
+    db=(await serverRequest('workspace')).workspace; db.language=language;
+    await writeServerCache({email:serverEmail,workspace:db,queue:[]});
+    render(); flash(t('Offline submissions sent.','Envois hors ligne transmis.'));
+  } catch(err) { if(!(err instanceof TypeError)) flash(errorText(err)); }
+  finally { syncing=false; }
+}
+globalThis.addEventListener?.('online',()=>{render();flushPending();});
+globalThis.addEventListener?.('offline',()=>{if(serverMode && signedIn) render();});
 const esc=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(en,fr)=>db?.language==='fr'?fr:en;
 const localInputTime=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
@@ -87,9 +122,17 @@ function signInView() {
 function render() {
   document.documentElement.lang=db.language;
   document.body.classList.toggle('drawer-open',signedIn && drawerOpen);
-  if(!signedIn) { app.innerHTML=signInView(); return; }
+  if(!signedIn) { app.innerHTML=signInView(); if(serverMode) { app.querySelector('.demo-access')?.remove(); app.querySelector('.signin-card > p').textContent=t('Use your provisioned company account. Sign-in requires a connection.','Utilisez votre compte autorisé par l’entreprise. La connexion nécessite Internet.'); app.querySelector('.signin-footer span').textContent=t('Company server','Serveur de l’entreprise'); if(authMode==='signup') { app.querySelector('[name="password"]').minLength=12; app.querySelector('[name="confirm"]').minLength=12; app.querySelector('#auth-message').insertAdjacentHTML('beforebegin',`<label class="field"><span>${t('Activation code from IT','Code d’activation fourni par IT')}</span><input name="invite" autocomplete="one-time-code" required></label>`); } } return; }
   app.innerHTML=`<div class="shell"><button class="drawer-scrim ${drawerOpen?'visible':''}" data-action="menu-close" aria-label="${t('Close navigation','Fermer la navigation')}"></button><aside class="sidebar ${drawerOpen?'open':''}" id="sidebar"><div class="brand"><img src="./assets/amms-logo-monitoring.png" alt="AMMS · AGRIDIAM Maintenance Monitoring System" class="brand-logo"><img src="./assets/amms-app-icon-green-a.png" alt="AMMS" class="brand-mini"><button class="drawer-close" data-action="menu-close" aria-label="${t('Close navigation','Fermer la navigation')}">×</button></div><div class="workspace-label">${t('WORKSPACE','ESPACE DE TRAVAIL')} <span>DEMO</span></div><nav aria-label="${t('Navigation','Navigation')}">${Object.entries(labels).filter(([key])=>key!=='Work').map(([key,v])=>`<button class="nav-item ${(page===key || key==='Requests' && page==='Work')?'active':''}" data-page="${key}" title="${t(...v)}" ${(page===key || key==='Requests' && page==='Work')?'aria-current="page"':''}>${navIcon(key)}<span class="nav-label">${t(...v)}</span></button>`).join('')}</nav><div class="sidebar-foot"><strong>${t('Local prototype','Prototype local')}</strong><p>${t('Records and photos stay in this browser. Export a backup before clearing browser data.','Les données et photos restent dans ce navigateur. Exportez une sauvegarde avant de vider le navigateur.')}</p>${button(t('Export backup','Exporter une sauvegarde'),'export')}</div></aside><main class="main"><header class="topbar"><button class="menu-button" data-action="menu" aria-label="${t('Toggle navigation','Afficher ou masquer la navigation')}" aria-expanded="${drawerOpen}" aria-controls="sidebar"><span></span><span></span><span></span></button><div class="breadcrumb">AMMS <span>/</span> ${t(...labels[page])}</div><div class="top-actions"><label class="search"><input id="search" type="search" aria-label="${t('Search current view','Rechercher dans cette vue')}" placeholder="${t('Search current view','Rechercher dans cette vue')}" value="${esc(query)}"></label><select id="language" aria-label="${t('Language','Langue')}"><option value="fr" ${db.language==='fr'?'selected':''}>FR</option><option value="en" ${db.language==='en'?'selected':''}>EN</option></select><button class="role-chip" data-page="Profile" title="${t('View profile','Voir le profil')}"><span class="profile-chip-avatar" aria-hidden="true">${avatarText(db.role)}</span><span>${esc(db.actor || label(db.role))}</span></button><button class="signout-button" data-action="signout" title="${t('Leave demo','Quitter la démo')}">${t('Exit','Quitter')}</button></div></header><div class="content"><div class="demo-banner"><strong>DEMO</strong> · ${t('Equipment names are sourced from AGRIDIAM reports. Records stay on this device; role selection is not authentication.','Les noms des équipements proviennent des rapports AGRIDIAM. Les données restent sur cet appareil ; le choix de rôle ne constitue pas une authentification.')}</div>${detail?recordView():view()}</div></main>${dialog?modal():''}</div><section id="print-area"></section>`;
   if(dialog) { document.querySelector('.modal input:not([type=hidden]),.modal textarea,.modal select,.choice-card')?.focus(); document.querySelector('#photo-preview')?.insertAdjacentHTML('beforeend',photoPreview()); }
+  if(serverMode) {
+    app.querySelector('.workspace-label span').textContent=t('SERVER','SERVEUR');
+    app.querySelector('.sidebar-foot strong').textContent=t('Shared workspace','Espace partagé');
+    app.querySelector('.sidebar-foot p').textContent=t('Records are stored on the company server.','Les données sont enregistrées sur le serveur de l’entreprise.');
+    app.querySelector('.demo-banner')?.remove();
+    app.querySelectorAll('[name="role"],[name="actor"]').forEach(el=>el.disabled=true);
+    if(!navigator.onLine || pendingCommands.length) app.querySelector('.content')?.insertAdjacentHTML('afterbegin',`<div class="demo-banner" role="status">${!navigator.onLine?t('The connection is lost. You are offline now.','La connexion est perdue. Vous êtes hors ligne.'):t('Some submissions are waiting to be sent.','Des envois attendent la connexion.')} ${pendingCommands.length?`(${pendingCommands.length})`:''}</div>`);
+  }
 }
 function view() {
   if(page==='Overview') {
@@ -273,6 +316,31 @@ function setWizardStep(step) {
   document.querySelector('.wizard-panel.active input,.wizard-panel.active select,.wizard-panel.active textarea')?.focus();
 }
 async function mutate(fn) { const next=structuredClone(db); const result=fn(next); await writeWorkspace(next); db=next; return result; }
+async function submitCommand(type,id,values={}) {
+  if(serverMode) {
+    const command={type,id,values,key:crypto.randomUUID()};
+    queuedLast=false;
+    const next=structuredClone(db),before=recordIds(next);
+    applyCommand(next,command);
+    command.created=newRecordIds(next,before);
+    assignCreated(next,before,command.created);
+    if(!pendingCommands.length) {
+      try {
+        const language=db.language;
+        const result=await serverRequest('command','POST',command);
+        db=result.workspace; db.language=language;
+        await writeServerCache({email:serverEmail,workspace:db,queue:[]});
+        return;
+      } catch(err) { if(!(err instanceof TypeError)) throw err; }
+    }
+    pendingCommands.push(command);
+    await writeServerCache({email:serverEmail,workspace:next,queue:pendingCommands});
+    db=next; queuedLast=true;
+    if(navigator.onLine) flushPending();
+    return;
+  }
+  return mutate(next=>applyCommand(next,{type,id,values}));
+}
 function interventionPrint(request,work) {
   const id=request.id;
   const actors=[...new Set((work?.history || []).filter(e=>['Work started','Work completed'].includes(e.action)).map(e=>e.actor).filter(Boolean))];
@@ -303,11 +371,11 @@ document.addEventListener('click',async e=>{
   const {action,id}=target.dataset;
   if(action==='menu') { drawerOpen=!drawerOpen; render(); (drawerOpen?document.querySelector('.drawer-close'):document.querySelector('.menu-button'))?.focus(); return; }
   if(action==='menu-close') { drawerOpen=false; render(); document.querySelector('.menu-button')?.focus(); return; }
-  if(action==='signout') { signedIn=false; try { sessionStorage.removeItem('amms-demo-session'); } catch {} render(); return; }
+  if(action==='signout') { if(serverMode) await serverRequest('logout','POST',{}).catch(()=>{}); signedIn=false; try { sessionStorage.removeItem('amms-demo-session'); } catch {} render(); return; }
   if(action==='auth-mode') { authMode=id; render(); return; }
   if(action==='choose-intervention') { dialog={type:db.role==='Maintenance Responsible'?'choose-intervention':'new-request'}; wizardStep=0; render(); return; }
   if(action==='remove-intervention') { const r=db.requests.find(x=>x.id===id); if(!flow.canRemoveIntervention(db,r)) { flash(t('This intervention can no longer be removed.','Cette intervention ne peut plus être supprimée.')); return; } dialog={type:'remove-intervention',id}; render(); return; }
-  if(action==='confirm-remove') { try { busy=true; await mutate(next=>flow.removeIntervention(next,id)); dialog=null; detail=null; render(); flash(t('Intervention removed.','Intervention supprimée.')); } catch(err) { flash(errorText(err)); } finally { busy=false; } return; }
+  if(action==='confirm-remove') { try { busy=true; await submitCommand('remove-intervention',id); dialog=null; detail=null; render(); flash(t('Intervention removed.','Intervention supprimée.')); } catch(err) { flash(errorText(err)); } finally { busy=false; } return; }
   if(action==='profile-role') { if(!flow.roles.includes(id)) return; if(page!=='Profile') profileReturn={page,detail}; profileRole=id; page='Profile'; detail=null; drawerOpen=false; render(); return; }
   if(action==='back-profile') { page=profileReturn?.page || 'Overview'; detail=profileReturn?.detail || null; profileReturn=null; render(); return; }
   if(action==='wizard-next') { const fields=[...document.querySelector(`.wizard-panel[data-step="${wizardStep}"]`).querySelectorAll('input,select,textarea')]; const invalid=fields.find(field=>!field.checkValidity()); if(invalid) { invalid.reportValidity(); return; } setWizardStep(Math.min(wizardStep+1,2)); return; }
@@ -322,7 +390,7 @@ document.addEventListener('click',async e=>{
   if(action==='export') { const url=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download=`AMMS-backup-${flow.today()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }
   try {
     if(action==='start-work' || action==='generate-pm') {
-      busy=true; await mutate(next=>action==='start-work'?flow.updateWork(next,id,'start'):flow.generatePM(next,id)); render(); flash(t('Saved in this browser.','Enregistré dans ce navigateur.')); return;
+      busy=true; await submitCommand(action,id); render(); flash(queuedLast?t('You are offline. This submission will be sent when the connection returns.','Vous êtes hors ligne. Cet envoi sera transmis au retour de la connexion.'):serverMode?t('Saved on the server.','Enregistré sur le serveur.'):t('Saved in this browser.','Enregistré dans ce navigateur.')); return;
     }
     dialog={type:action,id,completionDefault:action==='complete-work'?localInputTime():undefined}; pendingPhotos=[]; pendingProforma=null; wizardStep=0; render();
   } catch(err) { flash(errorText(err)); } finally { busy=false; }
@@ -348,7 +416,7 @@ document.addEventListener('change',async e=>{
     return;
   }
   if(el.id==='language' || el.name==='role' || el.name==='actor') {
-    try { await mutate(next=>{ if(el.id==='language') next.language=el.value; else next[el.name]=el.value; }); render(); } catch(err) { flash(errorText(err)); }
+    try { if(serverMode) { if(el.id==='language') { db.language=el.value; localStorage.setItem('amms-language',el.value); } } else await mutate(next=>{ if(el.id==='language') next.language=el.value; else next[el.name]=el.value; }); render(); } catch(err) { flash(errorText(err)); }
   }
   if(el.name==='workOrderId' && el.value) { const w=db.workOrders.find(w=>w.id===el.value); document.querySelector('[name=equipmentId]').value=w.equipmentId; }
 });
@@ -359,7 +427,16 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Tab') { const nodes=[...document.querySelectorAll('.modal button,.modal input,.modal select,.modal textarea,.modal a')].filter(el=>!el.disabled); const first=nodes[0],last=nodes.at(-1); if(e.shiftKey && document.activeElement===first) { e.preventDefault(); last.focus(); } else if(!e.shiftKey && document.activeElement===last) { e.preventDefault(); first.focus(); } }
 });
 document.addEventListener('submit',async e=>{
-  if(e.target.id==='account-form') { e.preventDefault(); const values=new FormData(e.target); const message=document.querySelector('#auth-message'); if(authMode==='signup' && values.get('password')!==values.get('confirm')) { message.textContent=t('Passwords do not match.','Les mots de passe ne correspondent pas.'); return; } message.textContent=t('The company account server is not connected yet. Use the demo access below to test AMMS.','Le serveur de comptes de l’entreprise n’est pas encore connecté. Utilisez l’accès démo ci-dessous pour tester AMMS.'); return; }
+  if(e.target.id==='account-form') {
+    e.preventDefault(); const values=Object.fromEntries(new FormData(e.target)); const message=document.querySelector('#auth-message');
+    if(authMode==='signup' && values.password!==values.confirm) { message.textContent=t('Passwords do not match.','Les mots de passe ne correspondent pas.'); return; }
+    if(!serverMode) { message.textContent=t('The company account server is not connected yet. Use the demo access below to test AMMS.','Le serveur de comptes de l’entreprise n’est pas encore connecté. Utilisez l’accès démo ci-dessous pour tester AMMS.'); return; }
+    try {
+      if(authMode==='signup') { await serverRequest('signup','POST',values); authMode='signin'; render(); document.querySelector('#auth-message').textContent=t('Account created. Sign in now.','Compte créé. Connectez-vous.'); }
+      else { await serverRequest('login','POST',values); await refreshServer(); render(); }
+    } catch(err) { message.textContent=errorText(err); }
+    return;
+  }
   if(e.target.id==='signin-form') { e.preventDefault(); const v=Object.fromEntries(new FormData(e.target)); if(!v.actor?.trim()) return; try { await mutate(next=>{ next.actor=v.actor.trim(); next.role=v.role; }); signedIn=true; try { sessionStorage.setItem('amms-demo-session','1'); } catch {} render(); } catch(err) { flash(errorText(err)); } return; }
   if(e.target.id!=='entry') return; e.preventDefault(); if(busy) return;
   if(dialog.type in wizardNames && wizardStep<2) { const invalid=[...e.target.querySelectorAll(`.wizard-panel[data-step="${wizardStep}"] input,.wizard-panel[data-step="${wizardStep}"] select,.wizard-panel[data-step="${wizardStep}"] textarea`)].find(field=>!field.checkValidity()); if(invalid) invalid.reportValidity(); else setWizardStep(wizardStep+1); return; }
@@ -368,24 +445,18 @@ document.addEventListener('submit',async e=>{
   if(type==='complete-work' && v.completedAt===dialog.completionDefault) delete v.completedAt;
   busy=true; const submit=e.target.querySelector('[type=submit]'); submit.disabled=true;
   try {
-    await mutate(next=>{
-      if(type==='new-work') flow.issueWork(next,v);
-      else if(type==='site-risk') flow.submitSiteRiskAssessment(next,id,v);
-      else if(type==='new-request') flow.addRequest(next,v);
-      else if(type==='assess') flow.assess(next,id,v);
-      else if(type==='review') flow.reviewRequest(next,id,v.decision,v);
-      else if(type==='complete-work') flow.updateWork(next,id,'complete',v);
-      else if(type==='new-part') flow.addPartRequest(next,v);
-      else if(type==='part-review') flow.updatePart(next,id,v.decision,v);
-      else if(['order','receive','accept','close-part'].includes(type)) flow.updatePart(next,id,type==='close-part'?'close':type,v);
-      else if(type==='new-equipment') flow.addEquipment(next,v);
-      else if(type==='new-pm') flow.addPM(next,v);
-      else if(type==='new-report') flow.addReport(next,v);
-      else if(type==='approve-report') flow.approveReport(next,id,v);
-      else throw new Error('Unknown action');
-    });
-    dialog=null; pendingPhotos=[]; pendingProforma=null; render(); flash(t('Saved in this browser.','Enregistré dans ce navigateur.'));
+    await submitCommand(type,id,v);
+    dialog=null; pendingPhotos=[]; pendingProforma=null; render(); flash(queuedLast?t('You are offline. This submission will be sent when the connection returns.','Vous êtes hors ligne. Cet envoi sera transmis au retour de la connexion.'):serverMode?t('Saved on the server.','Enregistré sur le serveur.'):t('Saved in this browser.','Enregistré dans ce navigateur.'));
   } catch(err) { document.querySelector('#form-error').textContent=errorText(err); submit.disabled=false; }
   finally { busy=false; }
 });
-try { db=await readWorkspace(); render(); finishSplash(); } catch(err) { app.innerHTML=`<main class="content"><h1>AMMS</h1><p>${esc(errorText(err))}</p><p>${t('Saved data has not been overwritten.','Les données enregistrées n’ont pas été écrasées.')}</p></main>`; finishSplash(true); }
+try {
+  db=flow.seed();
+  if(globalThis.location && location.protocol!=='file:') {
+    try { serverMode=(await serverRequest('status')).mode==='server'; if(serverMode) localStorage.setItem('amms-server-mode','1'); else localStorage.removeItem('amms-server-mode'); }
+    catch { serverMode=localStorage.getItem('amms-server-mode')==='1'; }
+    if(serverMode) { signedIn=false; db.language=localStorage.getItem('amms-language') || db.language; try { await refreshServer(); } catch {} }
+    else db=await readWorkspace();
+  } else db=await readWorkspace();
+  render(); finishSplash();
+} catch(err) { app.innerHTML=`<main class="content"><h1>AMMS</h1><p>${esc(errorText(err))}</p><p>${t('Saved data has not been overwritten.','Les données enregistrées n’ont pas été écrasées.')}</p></main>`; finishSplash(true); }
