@@ -41,3 +41,13 @@ export async function writeWorkspace(value) {
     tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error); tx.onabort=()=>reject(tx.error || new Error('Save aborted.'));
   }); } finally { db.close(); }
 }
+export async function readServerCache() {
+  const db=await open();
+  try { return await new Promise((resolve,reject)=>{const request=db.transaction('workspace').objectStore('workspace').get('server-cache');request.onsuccess=()=>resolve(request.result || null);request.onerror=()=>reject(request.error);}); }
+  finally { db.close(); }
+}
+export async function writeServerCache(value) {
+  const db=await open();
+  try { await new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'server-cache');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);}); }
+  finally { db.close(); }
+}
