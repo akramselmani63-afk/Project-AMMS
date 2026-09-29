@@ -31,8 +31,9 @@ const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: s
   'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'addPM',
   'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
+const commands = await source('src/commands.js', 'const flow = workflow;', ['applyCommand','recordIds','assignCreated','newRecordIds']);
 const photos = await source('src/photos.js', '', ['MAX_PHOTOS', 'validatePhotos', 'readPhotos', 'readProforma']);
-const indexed = await source('src/storage.js', 'const {load, migrate} = workflow;', ['readWorkspace', 'writeWorkspace']);
+const indexed = await source('src/storage.js', 'const {load, migrate} = workflow;', ['readWorkspace', 'writeWorkspace','readServerCache','writeServerCache']);
 let app = (await read('src/app.js'))
   .replace(/^import .*?;\r?\n/gm, '')
   .replaceAll('./assets/agridiam-logo.png', logo)
@@ -72,7 +73,7 @@ const storage = (() => {
   return {readWorkspace, writeWorkspace};
 })();`;
 
-const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readPhotos,readProforma} = photosModule;\n${app}\n})();`;
+const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst commandsModule = ${commands};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {applyCommand,recordIds,assignCreated,newRecordIds} = commandsModule;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readServerCache,writeServerCache} = indexed;\nconst {readPhotos,readProforma} = photosModule;\n${app}\n})();`;
 const css = (await read('styles.css')).replaceAll("./assets/agridiam-logo.png", logo);
 const startup = `const showStartupError = event => { const app = document.getElementById('app'); if (app && !app.querySelector('.shell')) { const message = event.reason?.message || event.message || 'Unknown startup error'; app.innerHTML = '<main style="font:16px Arial,sans-serif;padding:32px;max-width:700px"><h1>AMMS could not open / AMMS ne peut pas démarrer</h1><p>' + String(message).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</p></main>'; app.removeAttribute('inert'); document.getElementById('splash')?.remove(); } }; window.addEventListener('error', showStartupError); window.addEventListener('unhandledrejection', showStartupError);`;
 const html = `<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="theme-color" content="#152c35">\n<title>AMMS · AGRIDIAM Maintenance Management System</title>\n<link rel="icon" type="image/png" href="${appIcon}">\n<style>${css}</style>\n</head>\n<body>\n<div id="splash" class="splash" role="status" aria-label="Opening AMMS / Ouverture d’AMMS"><div class="splash-content"><img class="splash-logo" src="${openingLogo}" alt="AMMS · AGRIDIAM Maintenance Monitoring System"><div class="splash-credit"><span>BY</span><img src="${logo}" alt="AGRIDIAM"></div></div></div>\n<div id="app" inert></div>\n<script>${startup}</script>\n<script>${script.replaceAll('</script', '<\\/script')}</script>\n</body>\n</html>\n`;
