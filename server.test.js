@@ -27,7 +27,8 @@ test('company server shares records and enforces account roles',async()=>{
   const inviteHash=createHash('sha256').update(invite).digest('hex');
   await writeFile(join(directory,'users.json'),JSON.stringify({
     'employee@example.test':{name:'Test Employee',role:'Employee',inviteHash},
-    'hse@example.test':{name:'Test HSE',role:'HSE',inviteHash}
+    'hse@example.test':{name:'Test HSE',role:'HSE',inviteHash},
+    'viewer@example.test':{name:'Test Employee',role:'Developer Admin',inviteHash}
   }));
   const server=createServer((req,res)=>{api(req,res);});
   server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -38,19 +39,26 @@ test('company server shares records and enforces account roles',async()=>{
   };
   try {
     assert.equal((await request('/api/signup','POST',{email:'employee@example.test',password:'a strong test password',invite:'wrong'})).status,400);
-    for(const email of ['employee@example.test','hse@example.test']) assert.equal((await request('/api/signup','POST',{email,password:'a strong test password',invite})).status,201);
+    for(const email of ['employee@example.test','hse@example.test','viewer@example.test']) assert.equal((await request('/api/signup','POST',{email,password:'a strong test password',invite})).status,201);
     const employee=(await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password'})).cookie;
     const hse=(await request('/api/login','POST',{email:'hse@example.test',password:'a strong test password'})).cookie;
+    const viewerLogin=await request('/api/login','POST',{email:'viewer@example.test',password:'a strong test password'});
+    const viewer=viewerLogin.cookie;
+    assert.equal(viewerLogin.data.user.role,'Viewer');
     const initial=await request('/api/workspace','GET',null,employee);
     const equipmentId=initial.data.workspace.equipment[0].id;
     const id=`IR-${'a'.repeat(32)}`, key='11111111-1111-4111-8111-111111111111';
     const command={type:'new-request',values:{title:'Test fault',equipmentId,reportedBy:'Test Employee'},created:{equipment:[],requests:[id],workOrders:[],preventive:[],partRequests:[],reports:[]},key};
     assert.equal((await request('/api/command','POST',command,employee)).status,200);
+    assert.equal((await request('/api/command','POST',{type:'remove-intervention',id,key:'22222222-2222-4222-8222-222222222222'},viewer)).status,409);
+    assert.equal((await request('/api/command','POST',{...command,key:'33333333-3333-4333-8333-333333333333'},viewer)).status,409);
     assert.equal((await request('/api/revision','GET',null,hse)).data.revision,1);
     assert.equal((await request('/api/command','POST',command,employee)).data.workspace.requests.filter(r=>r.id===id).length,1);
     assert.equal((await request('/api/command','POST',command,hse)).status,409);
     const shared=await request('/api/workspace','GET',null,hse);
     assert.equal(shared.data.workspace.requests[0].id,id);
+    assert.equal(shared.data.workspace.requests[0].reportedBy,'Test Employee');
+    assert.equal(shared.data.workspace.requests[0].reportedRole,'Employee');
     assert.equal(shared.data.workspace.role,'HSE');
     assert.doesNotMatch(await readFile(join(directory,'users.json'),'utf8'),/a strong test password/);
   } finally { server.close();await once(server,'close');await rm(directory,{recursive:true,force:true}); }
