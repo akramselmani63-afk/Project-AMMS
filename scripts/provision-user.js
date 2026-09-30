@@ -7,7 +7,7 @@ import { roles } from '../src/workflow.js';
 const [address,name,role]=process.argv.slice(2);
 const domain=String(process.env.AMMS_EMAIL_DOMAIN || '').toLowerCase().replace(/^@/,'');
 if(!domain || !address?.toLowerCase().endsWith(`@${domain}`) || !name?.trim() || !roles.includes(role)) {
-  console.error('Usage: set AMMS_EMAIL_DOMAIN, then node scripts/provision-user.js email@domain "Full Name" "Employee|Maintenance Engineer|Maintenance Responsible|HSE|Purchasing Department|Developer Admin"');
+  console.error('Usage: set AMMS_EMAIL_DOMAIN, then node scripts/provision-user.js email@domain "Full Name" "Employee|Maintenance Engineer|Maintenance Responsible|HSE|Purchasing Department|Viewer"');
   process.exit(1);
 }
 const directory=resolve(process.env.AMMS_DATA_DIR || join(homedir(),'Documents','AMMS-Server'));
