@@ -25,7 +25,7 @@ IT provisions each person's email, name and role. This prints a one-time activat
 node scripts/provision-user.js 'person@company.example' 'Person Name' 'Maintenance Engineer'
 ```
 
-Allowed roles are Employee, Maintenance Engineer, Maintenance Responsible, HSE, Purchasing Department and Developer Admin. Passwords are salted and hashed on the server. The server keeps account cookies for eight hours; restarting the service signs users out. Company data and account files stay in `AMMS_DATA_DIR`, outside the public app files. Back up that directory while the service is stopped or from a filesystem snapshot. Do not put it in a web-served folder. The server binds to localhost by default; IT must configure the HTTPS proxy, DNS, firewall and service startup. Set `AMMS_PUBLIC_URL` to the final HTTPS address so cookies use the Secure flag.
+Allowed roles are Employee, Maintenance Engineer, Maintenance Responsible, HSE, Purchasing Department and Viewer. Viewer can read records but cannot submit, approve, change, or remove them. Existing Developer Admin accounts are treated as Viewer until IT updates their role. Passwords are salted and hashed on the server. The server keeps account cookies for eight hours; restarting the service signs users out. Company data and account files stay in `AMMS_DATA_DIR`, outside the public app files. Back up that directory while the service is stopped or from a filesystem snapshot. Do not put it in a web-served folder. The server binds to localhost by default; IT must configure the HTTPS proxy, DNS, firewall and service startup. Set `AMMS_PUBLIC_URL` to the final HTTPS address so cookies use the Secure flag.
 
 Users must sign in while connected. If the connection drops afterward, the app keeps its cached workspace and queues submissions on that device. It sends them in order when the server becomes reachable. A conflicting submission remains queued and needs review; it is not silently discarded. Queued data, including photos, stays in that browser's IndexedDB, so do not clear browser data before it syncs. The portable HTML and older local records are **not** automatically imported into the shared server. Validate the equipment list and plan any import with IT before operational use.
 
@@ -79,11 +79,11 @@ The npm dev/test/build aliases remain available. Only run one server on port 417
 | Maintenance Responsible | Assign interventions directly; intervention/purchase/report approval; execute alone or jointly; remove unstarted interventions; sign completed work on paper |
 | HSE | Pre-work safety authorization and post-work safety closure |
 | Purchasing Department | Supplier/quotation/order and delivery recording (French: Service achats) |
-| Developer Admin | Development/diagnostics; no operational approval powers |
+| Viewer | Read-only access for IT or management |
 
 Planning is a maintenance responsibility, not a separate user role. All narrative notes/comments are optional; identifiers, selections and quantities still receive validation. The operational-check/witness field has been removed. All roles can read records. In local demo mode the role switcher is only a preview; in company server mode IT assigns the role and the server checks it for every change. Names and role events in the history are not digital signatures.
 
-Interventions show a facepile of assigned maintenance roles. Selecting an avatar or the profile control opens a demo profile with role permissions. The current demo user's avatar uses their first and last name initials; unnamed role placeholders use role abbreviations. Profiles are role previews; other people's names and emails are not inferred or stored.
+Interventions show a facepile of assigned maintenance roles. Selecting an avatar or the top-bar profile control opens role details. The current user's avatar uses their first and last name initials; unnamed role placeholders use role abbreviations. New requests, parts requests and reports retain the creator's name and role. Older records without a stored creator role show the name alone.
 
 The earlier dashboard arrangement is restored: four counters, priority work, upcoming preventive schedule, new requests and purchasing attention. Status tabs with counts are available for interventions, purchasing and reports. Only Priority is shown in forms, details and printouts; historical severity values are retained in old records without being used.
 
