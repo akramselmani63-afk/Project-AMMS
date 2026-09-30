@@ -1,12 +1,12 @@
 import { load as loadBase, seed as seedBase, nextId } from './data.js';
 
-export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','HSE','Purchasing Department','Developer Admin'];
+export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','HSE','Purchasing Department','Viewer'];
 const maintenance = ['Maintenance Engineer','Maintenance Responsible'];
 export const rights = {
   Employee: ['request'],
   'Maintenance Engineer': ['request','assess','work','equipment','pm','parts','accept','report'],
   'Maintenance Responsible': ['request','assess','approve','work','equipment','pm','parts','accept','report'],
-  HSE: ['hse'], 'Purchasing Department': ['purchase'], 'Developer Admin': ['backup']
+  HSE: ['hse'], 'Purchasing Department': ['purchase'], Viewer: ['view']
 };
 export const can = (role, action) => rights[role]?.includes(action) || false;
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -37,6 +37,7 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
+  if(db.role==='Developer Admin') db.role='Viewer';
   if (db.schemaVersion >= 8) return db;
   if (db.schemaVersion >= 7) return migrateApprovedWork(db);
   if (db.schemaVersion >= 6) return migrateParts(db);
@@ -54,7 +55,7 @@ export function migrate(db) {
     w.status=w.status==='Completed' ? 'Legacy completed' : 'Awaiting approval';
     w.participants ||= ['Maintenance Engineer']; w.history ||= [];
     if (!w.requestId) {
-      const r={id:nextId(db.requests,'IR'),title:w.title,equipmentId:w.equipmentId,description:w.notes || '',status:'Submitted',priority:w.priority || 'P3',reportedBy:w.assignee || 'Legacy demo',createdAt:today(),photos:[],risks:[],history:[],legacyWorkId:w.id};
+      const r={id:nextId(db.requests,'IR'),title:w.title,equipmentId:w.equipmentId,description:w.notes || '',status:'Submitted',priority:w.priority || 'P3',reportedBy:w.assignee || 'Unknown',createdAt:today(),photos:[],risks:[],history:[],legacyWorkId:w.id};
       db.requests.push(r); w.requestId=r.id;
     }
     // Older prototype approvals were role previews, not recorded HSE approvals.
@@ -117,11 +118,11 @@ export const seed = () => migrate(seedBase());
 export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
-  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:required(v,'reportedBy'),createdBy:db.actor || db.role,createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
+  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:db.actor || required(v,'reportedBy'),reportedRole:db.role,createdBy:db.actor || db.role,createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
   audit(db,r,'Submitted'); db.requests.unshift(r); return r;
 }
 export function canRemoveIntervention(db,r) {
-  if(!r) return false;
+  if(!r || !can(db.role,'request')) return false;
   const actor=String(db.actor || '').trim();
   const requester=actor && actor===(r.createdBy || r.reportedBy);
   if(!requester && !maintenance.includes(db.role)) return false;
@@ -251,7 +252,7 @@ export function addPartRequest(db,v) {
   allow(db,'parts'); asset(db,v.equipmentId);
   if(v.workOrderId) { const w=record(db,'workOrders',v.workOrderId); requireValue(w.equipmentId===v.equipmentId,'Part and work order must refer to the same equipment.'); stage(w,'Awaiting risk assessment','Awaiting approval','Planned','In progress','Waiting for parts'); }
   const quantity=number(v.quantity,1); requireValue(Number.isInteger(quantity),'Quantity must be a whole number.');
-  const p={id:nextId(db.partRequests,'SPR'),title:required(v,'title'),reference:required(v,'reference'),equipmentId:v.equipmentId,workOrderId:v.workOrderId || null,quantity,unit:v.unit || 'pcs',description:optional(v,'description'),neededBy:required(v,'neededBy'),urgency:v.urgency || 'P3',equivalent:v.equivalent==='yes',photos:v.photos || [],status:db.role==='Maintenance Responsible'?'Purchasing':'Responsible review',createdAt:today(),requestedBy:db.actor || db.role,receivedQuantity:0,acceptedQuantity:0,rejectedQuantity:0,history:[],deliveries:[]};
+  const p={id:nextId(db.partRequests,'SPR'),title:required(v,'title'),reference:required(v,'reference'),equipmentId:v.equipmentId,workOrderId:v.workOrderId || null,quantity,unit:v.unit || 'pcs',description:optional(v,'description'),neededBy:required(v,'neededBy'),urgency:v.urgency || 'P3',equivalent:v.equivalent==='yes',photos:v.photos || [],status:db.role==='Maintenance Responsible'?'Purchasing':'Responsible review',createdAt:today(),requestedBy:db.actor || db.role,requestedRole:db.role,receivedQuantity:0,acceptedQuantity:0,rejectedQuantity:0,history:[],deliveries:[]};
   db.partRequests.unshift(p); audit(db,p,'Purchase requested');
   if(db.role==='Maintenance Responsible') audit(db,p,'Responsible approval');
   if(p.workOrderId) { const w=record(db,'workOrders',p.workOrderId); if(['Planned','In progress'].includes(w.status)) { w.status='Waiting for parts'; audit(db,w,'Waiting for parts',p.id); } }
@@ -300,7 +301,7 @@ export function addReport(db,v) {
   allow(db,'report'); const date=required(v,'date');
   const equipmentId=v.equipmentId || null; if(equipmentId) asset(db,equipmentId);
   const activities=interventionReports(db).filter(item=>item.date===date && inEquipmentScope(db,item.equipmentId,equipmentId));
-  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',equipmentId,author:db.actor || db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
+  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',equipmentId,author:db.actor || db.role,authorRole:db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
   db.reports.unshift(r); audit(db,r,'Report created'); return r;
 }
 export function inEquipmentScope(db,equipmentId,scopeId) {
