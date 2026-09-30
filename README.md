@@ -2,7 +2,7 @@
 
 Responsive French/English CMMS prototype for AGRIDIAM's maintenance team. No application dependencies or paid services are required. AGRIDIAM's supplied logo and blue/green identity are retained.
 
-AMMS has two modes. The portable file and default local server remain a single-device demo with role switching. Company server mode adds provisioned email/password accounts, shared records, server-checked workflow permissions and an offline submission queue. The operations dashboard shows active work, pending safety/approval, PM due within seven days, completed-work downtime over 30 days and priority distribution.
+AMMS has two modes. The portable file and default local server keep records on one device with local role switching. Company server mode adds provisioned email/password accounts, shared records, server-checked workflow permissions and an offline submission queue. New workspaces start with the sourced equipment list and no illustrative activity. The operations dashboard shows active work, pending safety/approval, PM due within seven days, completed-work downtime over 30 days and priority distribution.
 
 ## Company server preparation
 
