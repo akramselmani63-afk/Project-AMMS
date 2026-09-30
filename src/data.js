@@ -1,7 +1,7 @@
 import { sourceEquipment } from './source-assets.js';
 
 export const STORAGE_KEY = 'amms-demo-v1';
-export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Purchasing Department', 'Developer Admin'];
+export const roles = ['Employee', 'Maintenance Engineer', 'Maintenance Responsible', 'HSE', 'Purchasing Department', 'Viewer'];
 const day = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export function seed() {
@@ -11,20 +11,20 @@ export function seed() {
     language: 'fr',
     equipment: sourceEquipment.map(x => ({ ...x })),
     requests: [
-      { id: 'IR-001', title: 'Intermittent bag feed stop', equipmentId: 'EQ-139', severity: 'S3', priority: 'P1', status: 'Approved', reportedBy: 'Demo operator', createdAt: day(-1), description: 'Illustrative incident; not taken from the workbook.' },
-      { id: 'IR-002', title: 'Compressor pressure fluctuation', equipmentId: 'EQ-151', severity: 'S2', priority: 'P2', status: 'New', reportedBy: 'Demo operator', createdAt: day(0), description: 'Illustrative incident; not taken from the workbook.' },
-      { id: 'IR-003', title: 'Conveyor guide adjustment', equipmentId: 'EQ-141', severity: 'S1', priority: 'P3', status: 'New', reportedBy: 'Demo operator', createdAt: day(-2), description: 'Illustrative incident; not taken from the workbook.' }
+      { id: 'IR-001', title: 'Intermittent bag feed stop', equipmentId: 'EQ-139', severity: 'S3', priority: 'P1', status: 'Approved', reportedBy: 'Illustrative operator', createdAt: day(-1), description: 'Illustrative incident; not taken from the workbook.' },
+      { id: 'IR-002', title: 'Compressor pressure fluctuation', equipmentId: 'EQ-151', severity: 'S2', priority: 'P2', status: 'New', reportedBy: 'Illustrative operator', createdAt: day(0), description: 'Illustrative incident; not taken from the workbook.' },
+      { id: 'IR-003', title: 'Conveyor guide adjustment', equipmentId: 'EQ-141', severity: 'S1', priority: 'P3', status: 'New', reportedBy: 'Illustrative operator', createdAt: day(-2), description: 'Illustrative incident; not taken from the workbook.' }
     ],
     workOrders: [
-      { id: 'WO-001', title: 'Inspect bag transfer', equipmentId: 'EQ-139', requestId: 'IR-001', type: 'Corrective', priority: 'P1', status: 'In progress', assignee: 'Demo maintenance team', dueDate: day(1), notes: 'Illustrative work instructions.' },
-      { id: 'WO-002', title: 'Inspect sewing head', equipmentId: 'EQ-131', requestId: null, type: 'Preventive', priority: 'P3', status: 'Planned', assignee: 'Demo maintenance team', dueDate: day(3), notes: 'Illustrative work instructions.' }
+      { id: 'WO-001', title: 'Inspect bag transfer', equipmentId: 'EQ-139', requestId: 'IR-001', type: 'Corrective', priority: 'P1', status: 'In progress', assignee: 'Illustrative maintenance team', dueDate: day(1), notes: 'Illustrative work instructions.' },
+      { id: 'WO-002', title: 'Inspect sewing head', equipmentId: 'EQ-131', requestId: null, type: 'Preventive', priority: 'P3', status: 'Planned', assignee: 'Illustrative maintenance team', dueDate: day(3), notes: 'Illustrative work instructions.' }
     ],
     preventive: [
-      { id: 'PM-001', title: 'Inspect conveyor bearings', equipmentId: 'EQ-141', intervalDays: 30, nextDue: day(4), owner: 'Demo maintenance team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' },
-      { id: 'PM-002', title: 'Inspect compressor filters', equipmentId: 'EQ-151', intervalDays: 14, nextDue: day(2), owner: 'Demo utilities team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' }
+      { id: 'PM-001', title: 'Inspect conveyor bearings', equipmentId: 'EQ-141', intervalDays: 30, nextDue: day(4), owner: 'Illustrative maintenance team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' },
+      { id: 'PM-002', title: 'Inspect compressor filters', equipmentId: 'EQ-151', intervalDays: 14, nextDue: day(2), owner: 'Illustrative utilities team', instructions: 'Illustrative schedule; verify maintenance intervals with AGRIDIAM.' }
     ],
     reports: [
-      { id: 'SR-001', date: day(-1), shift: 'Day', author: 'Demo maintenance team', summary: 'Illustrative shift report; not an imported AGRIDIAM incident.', downtimeMinutes: 22, linkedWorkOrderId: 'WO-001' }
+      { id: 'SR-001', date: day(-1), shift: 'Day', author: 'Illustrative maintenance team', summary: 'Illustrative shift report; not an imported AGRIDIAM incident.', downtimeMinutes: 22, linkedWorkOrderId: 'WO-001' }
     ],
     parts: [
       { id: 'SP-001', name: 'Photoelectric sensor', sku: 'SENSOR-PE-01', quantity: 3, reorderPoint: 2, unit: 'pcs', location: 'Workshop A' },
@@ -64,7 +64,7 @@ export function load(storage = globalThis.localStorage) {
     const existing = new Set(data.equipment.map(x => x.id));
     data.equipment = [...sourceEquipment.filter(x => !existing.has(x.id)).map(x => ({...x})), ...data.equipment];
     for (const item of data.equipment) if (!item.source) item.source = 'Demo record';
-    if (!roles.includes(data.role)) data.role = ({Requester:'Employee',Technician:'Maintenance Engineer',Planner:'Maintenance Engineer',Supervisor:'Maintenance Responsible','Service Achats':'Purchasing Department',Admin:'Developer Admin'})[data.role] || 'Maintenance Engineer';
+    if (!roles.includes(data.role)) data.role = ({Requester:'Employee',Technician:'Maintenance Engineer',Planner:'Maintenance Engineer',Supervisor:'Maintenance Responsible','Service Achats':'Purchasing Department',Admin:'Viewer','Developer Admin':'Viewer'})[data.role] || 'Maintenance Engineer';
     if (!['en', 'fr'].includes(data.language)) data.language = 'fr';
     return data;
   } catch { throw new Error('Saved data could not be read. It has not been overwritten.'); }
@@ -92,4 +92,3 @@ export function sortedEquipment(items, locale='fr') {
     return left.length-right.length || collator.compare(a.id,b.id);
   });
 }
-
