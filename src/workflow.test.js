@@ -12,7 +12,7 @@ function approved(db,participants=['Maintenance Engineer']) {
 }
 const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
 test('requester or maintenance can remove only an unstarted, unreferenced intervention',()=>{
-  const db=f.seed(); db.role='Employee'; db.actor='Amina';
+  const db=f.seed({examples:true}); db.role='Employee'; db.actor='Amina';
   const own=request(db); assert.equal(f.canRemoveIntervention(db,own),true);
   db.actor='Other employee'; assert.equal(f.canRemoveIntervention(db,own),false);
   assert.throws(()=>f.removeIntervention(db,own.id),/cannot be removed/);
@@ -41,14 +41,14 @@ test('linked request and work order share intervention progress',()=>{
   w.status='Closed'; assert.equal(f.interventionProgressStep(r,w),5);
 });
 test('employee reports photos but cannot assess, approve, execute or purchase',()=>{
-  const db=f.seed(),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
+  const db=f.seed({examples:true}),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
   assert.throws(()=>f.assess(db,r.id,{priority:'P1'}),/role/);
   assert.throws(()=>f.addPartRequest(db,{}),/role/);
   for(const role of ['Employee','Viewer','Purchasing Department','HSE']) assert.equal(f.can(role,'work'),false);
 });
 
 for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible','HSE']]) test('independent approval order: '+order.join(' then '),()=>{
-  const db=f.seed(),r=request(db); db.role='Maintenance Engineer';
+  const db=f.seed({examples:true}),r=request(db); db.role='Maintenance Engineer';
   f.assess(db,r.id,{priority:'P3'});
   assert.equal(r.status,'Approval review');
   assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/role/);
@@ -62,7 +62,7 @@ for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible'
   assert.equal(db.workOrders.filter(w=>w.requestId===r.id).length,1);
 });
 test('return resets both approvals and requires reassessment without a mandatory reason',()=>{
-  const db=f.seed(),r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P1'});
+  const db=f.seed({examples:true}),r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P1'});
   db.role='HSE'; f.reviewRequest(db,r.id,'approve',{});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'return',{});
   assert.equal(r.hseApproval,undefined); assert.equal(r.status,'Returned');
@@ -71,7 +71,7 @@ test('return resets both approvals and requires reassessment without a mandatory
   assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/stage/);
 });
 test('Responsible direct order requires Engineer site assessment before HSE review',()=>{
-  const db=f.seed(); const v={title:'Direct work',equipmentId:'EQ-140',dueDate:f.today(),priority:'P3',participants:['Maintenance Engineer','Maintenance Responsible']};
+  const db=f.seed({examples:true}); const v={title:'Direct work',equipmentId:'EQ-140',dueDate:f.today(),priority:'P3',participants:['Maintenance Engineer','Maintenance Responsible']};
   assert.throws(()=>f.issueWork(db,v),/Only/);
   db.role='Maintenance Responsible'; const w=f.issueWork(db,v),r=db.requests.find(r=>r.id===w.requestId);
   assert.equal(w.status,'Awaiting risk assessment'); assert.equal(r.status,'Site risk assessment'); assert.ok(r.approval); assert.equal(r.hseApproval,undefined);
@@ -85,21 +85,21 @@ test('Responsible direct order requires Engineer site assessment before HSE revi
   assert.equal(w.confirmation,undefined); assert.equal(w.actions,''); assert.equal(w.status,'Closed');
 });
 test('v4 migration renames purchasing role and routes pending direct orders through site assessment',()=>{
-  const db=f.seed(); db.schemaVersion=4; db.role='Service Achats';
+  const db=f.seed({examples:true}); db.schemaVersion=4; db.role='Service Achats';
   const r={id:'IR-900',title:'Legacy direct',equipmentId:'EQ-140',status:'HSE review',priority:'P3',issuedByResponsible:true,approval:{actor:'Responsible'},risks:[],history:[]};
   const w={id:'WO-900',title:r.title,equipmentId:r.equipmentId,requestId:r.id,status:'Awaiting approval',participants:['Maintenance Responsible'],history:[]};
   db.requests.unshift(r); db.workOrders.unshift(w); f.migrate(db);
   assert.equal(db.schemaVersion,8); assert.equal(db.role,'Purchasing Department'); assert.equal(r.status,'Site risk assessment'); assert.equal(w.status,'Awaiting risk assessment'); assert.ok(w.participants.includes('Maintenance Engineer'));
 });
 for(const participants of [['Maintenance Engineer'],['Maintenance Responsible'],['Maintenance Engineer','Maintenance Responsible']]) test('completion closes work for '+participants.join(' + ')+' with paper signatures',()=>{
-  const db=f.seed(),w=approved(db,participants); db.role=participants[0];
+  const db=f.seed({examples:true}),w=approved(db,participants); db.role=participants[0];
   f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   assert.equal(w.status,'Closed');
   assert.equal(db.requests.find(r=>r.id===w.requestId).status,'Closed');
   assert.throws(()=>f.updateWork(db,w.id,'start'),/approval/);
 });
 test('Responsible part requests go directly to purchasing; all narrative fields can be empty',()=>{
-  const db=f.seed(); db.role='Maintenance Responsible';
+  const db=f.seed({examples:true}); db.role='Maintenance Responsible';
   const p=f.addPartRequest(db,{title:'Bearing',reference:'TEST-01',equipmentId:'EQ-140',quantity:1,neededBy:f.today()});
   assert.equal(p.status,'Purchasing'); assert.equal(p.description,'');
   db.role='Purchasing Department'; f.updatePart(db,p.id,'order',{supplier:'Demo',orderReference:'DEMO-01',expectedDate:f.today()});
@@ -111,7 +111,7 @@ test('Responsible part requests go directly to purchasing; all narrative fields 
   db.role='Maintenance Responsible'; f.approveReport(db,report.id,{}); assert.equal(report.status,'Approved');
 });
 test('v6 saved part requests gain missing delivery fields without losing their data',()=>{
-  const db=f.seed(); db.schemaVersion=6;
+  const db=f.seed({examples:true}); db.schemaVersion=6;
   const part={id:'SPR-001',title:'Existing bearing',reference:'B-01',status:'Purchasing',quantity:2};
   db.partRequests=[part]; f.migrate(db);
   assert.equal(db.schemaVersion,8);
@@ -121,7 +121,7 @@ test('v6 saved part requests gain missing delivery fields without losing their d
   assert.equal(part.title,'Existing bearing');
 });
 test('purchase order keeps a PDF proforma and rejects unsafe attachments',()=>{
-  const db=f.seed(); db.role='Maintenance Responsible';
+  const db=f.seed({examples:true}); db.role='Maintenance Responsible';
   const p=f.addPartRequest(db,{title:'Bearing',reference:'TEST-02',equipmentId:'EQ-140',quantity:1,neededBy:f.today()});
   db.role='Purchasing Department';
   const order={supplier:'Demo',orderReference:'PO-02',expectedDate:f.today()};
@@ -130,7 +130,7 @@ test('purchase order keeps a PDF proforma and rejects unsafe attachments',()=>{
   assert.equal(p.proforma.name,'quote.pdf');
 });
 test('v3 migration preserves approvals and data while exposing both reviewers',()=>{
-  const db=f.seed(); db.schemaVersion=3;
+  const db=f.seed({examples:true}); db.schemaVersion=3;
   const a=db.requests[0],b=db.requests[1]; a.status='Responsible review'; a.photos=[{name:'keep.jpg'}];
   b.status='HSE review'; b.approval={actor:'Existing Responsible',at:'2026-09-21'};
   f.migrate(db); assert.equal(db.schemaVersion,8); assert.equal(a.status,'Approval review'); assert.equal(a.photos[0].name,'keep.jpg');
@@ -138,7 +138,7 @@ test('v3 migration preserves approvals and data while exposing both reviewers',(
   assert.equal(f.canReviewRequest('HSE',a),true); assert.equal(f.canReviewRequest('Maintenance Responsible',a),true);
 });
 test('part purchase supports partial receipt, rejection/replacement and gates work',()=>{
-  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
+  const db=f.seed({examples:true}),w=approved(db); f.updateWork(db,w.id,'start');
   const p=f.addPartRequest(db,{title:'Bearing',reference:'6204',quantity:3,description:'Demo specification',neededBy:f.today(),equipmentId:w.equipmentId,workOrderId:w.id,photos:[{name:'reference.jpg',data:'demo'}]});
   assert.equal(w.status,'Waiting for parts'); assert.throws(()=>f.updateWork(db,w.id,'start'),/awaiting acceptance/);
   assert.throws(()=>f.updatePart(db,p.id,'order',{}),/role/);
@@ -156,20 +156,20 @@ test('part purchase supports partial receipt, rejection/replacement and gates wo
   f.updatePart(db,p.id,'close',{note:'Installed on equipment'}); assert.equal(p.status,'Closed');
 });
 test('invalid part quantities and mismatched work/equipment are rejected',()=>{
-  const db=f.seed(),w=approved(db);
+  const db=f.seed({examples:true}),w=approved(db);
   const v={title:'Bearing',reference:'6204',quantity:1,description:'Demo',neededBy:f.today(),equipmentId:w.equipmentId,workOrderId:w.id};
   for(const quantity of [-1,0,1.5,Infinity,'bad']) assert.throws(()=>f.addPartRequest(db,{...v,quantity}));
   assert.throws(()=>f.addPartRequest(db,{...v,equipmentId:'EQ-151'}),/same equipment/);
 });
 test('one central asset can be referenced by request, PM, WO and spare part',()=>{
-  const db=f.seed(); const e=f.addEquipment(db,{name:'Custom machine',parentId:'EQ-101'});
+  const db=f.seed({examples:true}); const e=f.addEquipment(db,{name:'Custom machine',parentId:'EQ-101'});
   const r=f.addRequest(db,{title:'Inspect',equipmentId:e.id,reportedBy:'Engineer',description:'Test'});
   const p=f.addPM(db,{title:'Test PM',equipmentId:e.id,intervalDays:14,nextDue:f.today(),instructions:'Inspect'});
   const s=f.addPartRequest(db,{title:'Part',reference:'TEST',equipmentId:e.id,quantity:1,description:'Test',neededBy:f.today()});
   assert.equal(r.equipmentId,p.equipmentId); assert.equal(s.equipmentId,e.id);
 });
 test('PM generates one open intervention and moves date when work is completed',()=>{
-  const db=f.seed(),p=db.preventive[0],due=p.nextDue; const r=f.generatePM(db,p.id);
+  const db=f.seed({examples:true}),p=db.preventive[0],due=p.nextDue; const r=f.generatePM(db,p.id);
   assert.throws(()=>f.generatePM(db,p.id),/already/); assert.equal(p.nextDue,due);
   f.assess(db,r.id,{priority:'P3',diagnosis:'Planned inspection'});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Approved'});
@@ -179,7 +179,7 @@ test('PM generates one open intervention and moves date when work is completed',
   assert.equal(p.lastCompleted,f.today()); assert.notEqual(p.nextDue,due); assert.doesNotThrow(()=>f.generatePM(db,p.id));
 });
 test('shift report snapshots daily work; approval makes it final',()=>{
-  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
+  const db=f.seed({examples:true}),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   const r=f.addReport(db,{date:f.today(),shift:'Day',summary:'Demo day',handover:'Follow up',diagnosis:'Bearing worn',risks:'Isolation',rootCause:'Wear',result:'Operational'});
   assert.equal(r.activities.find(a=>a.id===w.id)?.actions,'Replaced bearing'); w.actions='Changed later'; assert.equal(r.activities.find(a=>a.id===w.id)?.actions,'Replaced bearing');
   assert.equal(r.rootCause,'Wear'); assert.equal(r.result,'Operational');
@@ -189,7 +189,7 @@ test('shift report snapshots daily work; approval makes it final',()=>{
   assert.throws(()=>f.approveReport(db,r.id,{note:'Again'}),/stage/);
 });
 test('shift report equipment scope includes machines beneath a selected zone',()=>{
-  const db=f.seed(); db.role='Maintenance Engineer';
+  const db=f.seed({examples:true}); db.role='Maintenance Engineer';
   const date=f.today();
   db.requests.push({id:'IR-101',title:'Macro sample',equipmentId:'EQ-103',status:'New',createdAt:`${date}T10:00:00`});
   db.requests.push({id:'IR-102',title:'Micro sample',equipmentId:'EQ-106',status:'New',createdAt:`${date}T11:00:00`});
@@ -203,7 +203,7 @@ test('shift report equipment scope includes machines beneath a selected zone',()
   assert.throws(()=>f.addReport(db,{date,equipmentId:'missing'}),/valid equipment/);
 });
 test('one intervention report combines its request and work order',()=>{
-  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
+  const db=f.seed({examples:true}),w=approved(db); f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   const entries=f.interventionReports(db);
   assert.equal(entries.length,db.requests.length);
   const entry=entries.find(item=>item.requestId===w.requestId);
@@ -212,28 +212,28 @@ test('one intervention report combines its request and work order',()=>{
   assert.equal(entry.date,f.localDay(w.completedAt));
 });
 test('completion records current time by default and accepts an edited local time',()=>{
-  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
+  const db=f.seed({examples:true}),w=approved(db); f.updateWork(db,w.id,'start');
   const before=Date.now(); f.updateWork(db,w.id,'complete',completion);
   assert.ok(new Date(w.completedAt).getTime()>=before);
-  const db2=f.seed(),w2=approved(db2); f.updateWork(db2,w2.id,'start');
+  const db2=f.seed({examples:true}),w2=approved(db2); f.updateWork(db2,w2.id,'start');
   const edited=new Date(Date.now()+60_000);
   f.updateWork(db2,w2.id,'complete',{...completion,completedAt:`${edited.getFullYear()}-${String(edited.getMonth()+1).padStart(2,'0')}-${String(edited.getDate()).padStart(2,'0')}T${String(edited.getHours()).padStart(2,'0')}:${String(edited.getMinutes()).padStart(2,'0')}`});
   assert.equal(new Date(w2.completedAt).getHours(),edited.getHours());
   assert.equal(new Date(w2.completedAt).getMinutes(),edited.getMinutes());
 });
 test('downtime is calculated from start and finish and cannot be entered manually',()=>{
-  const db=f.seed(),w=approved(db); f.updateWork(db,w.id,'start');
+  const db=f.seed({examples:true}),w=approved(db); f.updateWork(db,w.id,'start');
   w.startedAt='2026-09-24T08:00:00.000Z';
   f.updateWork(db,w.id,'complete',{...completion,completedAt:'2026-09-24T09:15:00.000Z',downtimeMinutes:999});
   assert.equal(w.downtimeMinutes,75);
   assert.equal(f.interventionReports(db).find(item=>item.id===w.id).downtimeMinutes,75);
-  const other=f.seed(),legacy=approved(other); f.updateWork(other,legacy.id,'start');
+  const other=f.seed({examples:true}),legacy=approved(other); f.updateWork(other,legacy.id,'start');
   legacy.startedAt=undefined;
   assert.throws(()=>f.updateWork(other,legacy.id,'complete',completion),/start time/);
   assert.throws(()=>f.elapsedMinutes('2026-09-24T09:15:00Z','2026-09-24T08:00:00Z'),/before work started/);
 });
 test('migration preserves custom records, legacy status, parts and documents',()=>{
-  const db=f.seed(); db.schemaVersion=2; db.requests.push({id:'IR-999',title:'User text',status:'New',photos:[{name:'keep.jpg'}]});
+  const db=f.seed({examples:true}); db.schemaVersion=2; db.requests.push({id:'IR-999',title:'User text',status:'New',photos:[{name:'keep.jpg'}]});
   const parts=JSON.stringify(db.parts),docs=JSON.stringify(db.documents); f.migrate(db);
   assert.equal(db.requests.at(-1).title,'User text'); assert.equal(db.requests.at(-1).photos[0].name,'keep.jpg');
   assert.equal(JSON.stringify(db.parts),parts); assert.equal(JSON.stringify(db.documents),docs);
@@ -246,7 +246,7 @@ test('photo validation rejects unsafe types, excessive counts and large files',(
   assert.throws(()=>validatePhotos([{type:'image/png',size:9*1024*1024}]),/8 MB/);
 });
 test('priority alone is validated and new requests do not acquire severity',()=>{
- const db=f.seed(),r=request(db); db.role='Maintenance Engineer';
+ const db=f.seed({examples:true}),r=request(db); db.role='Maintenance Engineer';
  for(const priority of ['',null,'P0','P5']) assert.throws(()=>f.assess(db,r.id,{priority}),/priority/);
  f.assess(db,r.id,{priority:'P1'}); assert.equal(r.priority,'P1'); assert.equal(Object.hasOwn(r,'severity'),false);
 });
