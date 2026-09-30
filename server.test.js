@@ -10,7 +10,7 @@ import { seed } from './src/workflow.js';
 import { applyCommand, recordIds, newRecordIds, assignCreated } from './src/commands.js';
 
 test('offline direct assignment keeps its request and work linked after ID assignment',()=>{
-  const db=seed();db.role='Maintenance Responsible';db.actor='Test Responsible';
+  const db=seed({examples:true});db.role='Maintenance Responsible';db.actor='Test Responsible';
   const before=recordIds(db);
   applyCommand(db,{type:'new-work',values:{title:'Check motor',equipmentId:db.equipment[0].id,dueDate:'2026-10-01',priority:'P2',participants:['Maintenance Engineer']}});
   assignCreated(db,before,newRecordIds(db,before));
