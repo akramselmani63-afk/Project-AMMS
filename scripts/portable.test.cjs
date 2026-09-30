@@ -26,7 +26,7 @@ test('portable file opens records from every list', async () => {
     console: { warn() {} }, structuredClone
   });
   vm.runInContext(script, context);
-  const workspace = vm.runInContext('workflow.seed()', context);
+  const workspace = vm.runInContext('workflow.seed({examples:true})', context);
   workspace.actor = 'Akram Selmani';
   context.workspace = workspace;
   vm.runInContext('workflow.generatePM(workspace, workspace.preventive[0].id)', context);
