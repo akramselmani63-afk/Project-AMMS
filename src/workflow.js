@@ -114,7 +114,7 @@ export function canReviewRequest(role,r) {
   return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
 }
 
-export const seed = () => migrate(seedBase());
+export const seed = (options) => migrate(seedBase(options));
 export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
