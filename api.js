@@ -30,12 +30,13 @@ async function body(req) {
   catch { throw Object.assign(new Error('Invalid JSON object.'),{status:400}); }
 }
 const email=value=>String(value || '').trim().toLowerCase();
+const activeRole=role=>role==='Developer Admin'?'Viewer':role;
 const validEmail=value=>value.endsWith(`@${domain}`) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const cookie=req=>String(req.headers.cookie || '').split(';').map(x=>x.trim()).find(x=>x.startsWith('amms_session='))?.slice(13);
 function userFor(req,users) {
   const token=cookie(req),session=token && sessions.get(token);
   if(!session || session.expires<Date.now()) { if(token) sessions.delete(token); return null; }
-  return users[session.email]?.hash ? {email:session.email,...users[session.email]} : null;
+  return users[session.email]?.hash ? {email:session.email,...users[session.email],role:activeRole(users[session.email].role)} : null;
 }
 function view(workspace,user) { const {appliedCommands,...data}=workspace; return {...data,actor:user.name,role:user.role}; }
 async function workspace() {
@@ -83,7 +84,7 @@ export async function api(req,res) {
       }
       failed.delete(address);
       const token=randomBytes(32).toString('hex');sessions.set(token,{email:address,expires:Date.now()+8*60*60_000});
-      send(res,200,{user:{name:account.name,role:account.role,email:address}},{'set-cookie':`amms_session=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=28800${secureCookie}`});return true;
+      send(res,200,{user:{name:account.name,role:activeRole(account.role),email:address}},{'set-cookie':`amms_session=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=28800${secureCookie}`});return true;
     }
     const user=userFor(req,users);
     if(!user) {send(res,401,{error:'Sign in required.'});return true;}
