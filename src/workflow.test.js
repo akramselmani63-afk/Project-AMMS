@@ -44,7 +44,7 @@ test('employee reports photos but cannot assess, approve, execute or purchase',(
   const db=f.seed(),r=request(db); assert.equal(r.photos[0].name,'demo.jpg'); assert.equal(r.priority,null);
   assert.throws(()=>f.assess(db,r.id,{priority:'P1'}),/role/);
   assert.throws(()=>f.addPartRequest(db,{}),/role/);
-  for(const role of ['Employee','Developer Admin','Purchasing Department','HSE']) assert.equal(f.can(role,'work'),false);
+  for(const role of ['Employee','Viewer','Purchasing Department','HSE']) assert.equal(f.can(role,'work'),false);
 });
 
 for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible','HSE']]) test('independent approval order: '+order.join(' then '),()=>{
