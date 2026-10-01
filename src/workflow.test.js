@@ -10,7 +10,7 @@ function approved(db,participants=['Maintenance Engineer']) {
   db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Isolate and verify absence of energy'});
   db.role='Maintenance Engineer'; return db.workOrders.find(w=>w.requestId===r.id);
 }
-const completion={diagnosis:'Bearing worn',cause:'Wear',actions:'Replaced bearing',condition:'Operational',repair:'Permanent'};
+const completion={actions:'Replaced bearing'};
 test('requester or maintenance can remove only an unstarted, unreferenced intervention',()=>{
   const db=f.seed({examples:true}); db.role='Employee'; db.actor='Amina';
   const own=request(db); assert.equal(f.canRemoveIntervention(db,own),true);
@@ -208,7 +208,7 @@ test('one intervention report combines its request and work order',()=>{
   assert.equal(entries.length,db.requests.length);
   const entry=entries.find(item=>item.requestId===w.requestId);
   assert.equal(entry.id,w.id); assert.equal(entry.workOrderId,w.id);
-  assert.equal(entry.cause,'Wear'); assert.equal(entry.actions,'Replaced bearing');
+  assert.equal(entry.cause,''); assert.equal(entry.actions,'Replaced bearing'); assert.equal(entry.result,'');
   assert.equal(entry.date,f.localDay(w.completedAt));
 });
 test('completion records current time by default and accepts an edited local time',()=>{

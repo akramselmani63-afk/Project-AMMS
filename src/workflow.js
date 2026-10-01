@@ -11,6 +11,16 @@ export const rights = {
 export const can = (role, action) => rights[role]?.includes(action) || false;
 export const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const now = () => new Date().toISOString();
+export function requestIdAt(createdAt, requests=[]) {
+  const d=new Date(createdAt);
+  requireValue(Number.isFinite(d.getTime()),'Invalid request creation time.');
+  const base=`IR-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
+  const used=new Set(requests.map(r=>r.id));
+  if(!used.has(base)) return base;
+  let suffix=2;
+  while(used.has(`${base}-${String(suffix).padStart(2,'0')}`)) suffix++;
+  return `${base}-${String(suffix).padStart(2,'0')}`;
+}
 export const localDay = value => {
   if (!value) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -118,7 +128,8 @@ export const seed = (options) => migrate(seedBase(options));
 export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
-  const r={id:nextId(db.requests,'IR'),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:db.actor || required(v,'reportedBy'),reportedRole:db.role,createdBy:db.actor || db.role,createdAt:now(),status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
+  const createdAt=now();
+  const r={id:requestIdAt(createdAt,db.requests),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:db.actor || required(v,'reportedBy'),reportedRole:db.role,createdBy:db.actor || db.role,createdAt,status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
   audit(db,r,'Submitted'); db.requests.unshift(r); return r;
 }
 export function canRemoveIntervention(db,r) {
@@ -232,7 +243,7 @@ export function updateWork(db,id,action,v={}) {
   } else if(action==='complete') {
     stage(w,'In progress'); requireValue(w.participants.includes(db.role),'Only an assigned participant can complete work.');
     requireValue(!partsPending(db,w),'Required spare parts are still awaiting acceptance.');
-    const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),repair:required(v,'repair')};
+    const completion={diagnosis:optional(v,'diagnosis'),cause:optional(v,'cause'),actions:optional(v,'actions'),condition:optional(v,'condition'),repair:optional(v,'repair')};
     const finish=v.completedAt ? new Date(v.completedAt) : new Date();
     requireValue(!Number.isNaN(finish.getTime()),'Enter a valid completion time.');
     const start=w.startedAt || v.startedAt;
@@ -291,6 +302,29 @@ export function addPM(db,v) {
   allow(db,'pm'); asset(db,v.equipmentId); const intervalDays=number(v.intervalDays,1); requireValue(Number.isInteger(intervalDays),'Interval must be whole days.');
   const p={id:nextId(db.preventive,'PM'),title:required(v,'title'),equipmentId:v.equipmentId,intervalDays,nextDue:required(v,'nextDue'),owner:db.role,instructions:optional(v,'instructions')};
   db.preventive.push(p); return p;
+}
+export function recordReliability(db,v) {
+  allow(db,'equipment');
+  const equipment=record(db,'equipment',v.equipmentId);
+  requireValue(['Machine','Component'].includes(equipment.kind),'Select a machine or component. / Sélectionnez une machine ou un composant.');
+  const startDate=required(v,'startDate'), endDate=required(v,'endDate');
+  const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10)===value;
+  requireValue(validDate(startDate) && validDate(endDate) && startDate<=endDate && endDate<=today(),'Enter a valid past measurement period. / Saisissez une période de mesure valide, non future.');
+  const measuredNumber=key=>{const value=String(v[key] ?? '').trim(); requireValue(value!=='','Enter all measurement values. / Renseignez toutes les valeurs de mesure.'); return number(value);};
+  const operatingHours=measuredNumber('operatingHours');
+  const failureCount=measuredNumber('failureCount'), maintenanceCount=measuredNumber('maintenanceCount');
+  const failedUnitHours=number(v.failedUnitHours || 0), failedUnitCount=number(v.failedUnitCount || 0);
+  requireValue([failureCount,maintenanceCount,failedUnitCount].every(Number.isInteger),'Counts must be whole numbers. / Les nombres d’événements doivent être entiers.');
+  const periodHours=(Date.parse(endDate)-Date.parse(startDate))/3_600_000+24;
+  requireValue(operatingHours<=periodHours && (!(failureCount || maintenanceCount) || operatingHours>0),'Check operating hours against the period and counts. / Vérifiez les heures de fonctionnement par rapport à la période et aux événements.');
+  requireValue((failedUnitCount===0 && failedUnitHours===0) || (failedUnitCount>0 && failedUnitHours>0),'Enter both failed-unit count and total lifetimes. / Renseignez le nombre d’unités défaillantes et leur durée de vie totale.');
+  const logs=equipment.reliabilityLog || [];
+  const same=log=>log.startDate===startDate && log.endDate===endDate;
+  requireValue(!logs.some(log=>!same(log) && log.startDate<=endDate && log.endDate>=startDate),'Measurement periods cannot overlap. Edit the existing period instead. / Les périodes ne peuvent pas se chevaucher. Modifiez la période existante.');
+  const entry={startDate,endDate,operatingHours,failureCount,maintenanceCount,failedUnitHours,failedUnitCount,updatedAt:now(),actor:db.actor || db.role,role:db.role};
+  equipment.reliabilityLog=[...logs.filter(log=>!same(log)),entry].sort((a,b)=>b.startDate.localeCompare(a.startDate));
+  audit(db,equipment,'Reliability measurements recorded');
+  return entry;
 }
 export function generatePM(db,id) {
   allow(db,'pm'); const p=record(db,'preventive',id);

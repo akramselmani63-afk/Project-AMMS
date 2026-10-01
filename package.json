@@ -4,10 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/build-notifications.js",
     "dev": "node server.js",
     "build": "node scripts/build.js",
     "portable": "node scripts/portable.js",
+    "package:windows": "powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1",
     "test": "node --test"
+  },
+  "dependencies": {
+    "goey-toast": "^0.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
-

@@ -18,6 +18,7 @@ export function applyCommand(db, command) {
     case 'order': case 'receive': case 'accept': case 'close-part':
       return flow.updatePart(db,id,type==='close-part'?'close':type,values);
     case 'new-equipment': return flow.addEquipment(db,values);
+    case 'record-reliability': return flow.recordReliability(db,values);
     case 'new-pm': return flow.addPM(db,values);
     case 'new-report': return flow.addReport(db,values);
     case 'approve-report': return flow.approveReport(db,id,values);
@@ -35,10 +36,20 @@ export function assignCreated(db,before,created) {
     if(added.length!==ids.length) throw new Error('Created record count changed. Review pending submission.');
     for(let i=0;i<added.length;i++) {
       const old=added[i].id, replacement=ids[i];
-      if(typeof replacement!=='string' || !/^(EQ|IR|WO|PM|SPR|SR)-[a-f0-9]{32}$/.test(replacement) || db[key].some(item=>item!==added[i] && item.id===replacement)) throw new Error('Invalid or duplicate record ID.');
-      added[i].id=replacement;
-      for(const [collection,field] of links[key]) for(const item of db[collection] || []) if(item[field]===old) item[field]=replacement;
+      const legacyRequestId=key==='requests' && /^IR-[a-f0-9]{32}$/.test(replacement || '');
+      const valid=typeof replacement==='string' && (key==='requests'?legacyRequestId || /^IR-\d{8}-\d{6}(?:-\d{2,})?$/.test(replacement):/^(EQ|WO|PM|SPR|SR)-[a-f0-9]{32}$/.test(replacement));
+      if(!valid) throw new Error('Invalid record ID.');
+      let id=legacyRequestId?flow.requestIdAt(added[i].createdAt,db.requests.filter(item=>item!==added[i])):replacement;
+      if(db[key].some(item=>item!==added[i] && item.id===replacement)) {
+        if(key!=='requests') throw new Error('Duplicate record ID.');
+        const base=replacement.replace(/-\d{2,}$/,'');
+        let suffix=2;
+        while(db.requests.some(item=>item!==added[i] && item.id===`${base}-${String(suffix).padStart(2,'0')}`)) suffix++;
+        id=`${base}-${String(suffix).padStart(2,'0')}`;
+      }
+      added[i].id=id;
+      for(const [collection,field] of links[key]) for(const item of db[collection] || []) if(item[field]===old) item[field]=id;
     }
   }
 }
-export function newRecordIds(db,before) { return Object.fromEntries(collections.map(key=>[key,(db[key] || []).filter(item=>!before[key].has(item.id)).map(()=>`${{equipment:'EQ',requests:'IR',workOrders:'WO',preventive:'PM',partRequests:'SPR',reports:'SR'}[key]}-${crypto.randomUUID().replaceAll('-','')}`)])); }
+export function newRecordIds(db,before) { return Object.fromEntries(collections.map(key=>[key,(db[key] || []).filter(item=>!before[key].has(item.id)).map(item=>key==='requests'?item.id:`${{equipment:'EQ',workOrders:'WO',preventive:'PM',partRequests:'SPR',reports:'SR'}[key]}-${crypto.randomUUID().replaceAll('-','')}`)])); }

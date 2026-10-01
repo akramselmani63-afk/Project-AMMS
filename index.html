@@ -8,7 +8,9 @@
     <title>AMMS · AGRIDIAM Maintenance Management System</title>
     <link rel="icon" type="image/png" href="./assets/amms-app-icon-green-a.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./assets/notifications.css" />
     <link rel="stylesheet" href="./styles.css" />
+    <script src="./assets/notifications.js" defer></script>
     <script type="module" src="./src/app.js"></script>
     <script>if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});</script>
   </head>
@@ -22,4 +24,3 @@
     <div id="app" inert></div>
   </body>
 </html>
-

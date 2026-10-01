@@ -1,2 +1,5 @@
 dist/
 node_modules/
+tmp/npm-cache/
+assets/notifications.js
+assets/notifications.css
