@@ -27,5 +27,9 @@ test('KPI measurements validate exposure and periods and keep linked work separa
   assert.equal(db.equipment[1].reliabilityLog.length,1,'exact same interval is updated');
   stats=maintenanceStats(db,{days:0,now:new Date('2026-09-30T12:00:00Z')});
   assert.equal(stats.mtbf,null); assert.equal(stats.mtbm,null); assert.equal(stats.mttf,null);
+  db.equipment.push({id:'component',kind:'Component',parentId:'machine'});
+  recordReliability(db,{...measurement,equipmentId:'component',operatingHours:48,failureCount:1,maintenanceCount:1,failedUnitCount:0,failedUnitHours:0});
+  assert.equal(maintenanceStats(db,{equipmentId:'machine',days:0,now:new Date('2026-09-30T12:00:00Z')}).mtbf,null,'a machine uses its own measured exposure, not its component logs');
+  assert.equal(maintenanceStats(db,{equipmentId:'zone',days:0,now:new Date('2026-09-30T12:00:00Z')}).mtbf,288,'a zone pools asset exposure');
   db.role='Viewer'; assert.throws(()=>recordReliability(db,measurement),/role/);
 });

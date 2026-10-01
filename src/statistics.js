@@ -35,7 +35,9 @@ export function maintenanceStats(db, { days=30, equipmentId='', now=new Date() }
     byEquipment.set(work.equipmentId,(byEquipment.get(work.equipmentId) || 0)+hours);
   }
   const logs=[]; let partialLogs=0;
-  for(const equipment of db.equipment.filter(e=>scoped({equipmentId:e.id}))) {
+  const scopeKind=db.equipment.find(e=>e.id===equipmentId)?.kind;
+  const exactAsset=['Machine','Component'].includes(scopeKind);
+  for(const equipment of db.equipment.filter(e=>exactAsset?e.id===equipmentId:scoped({equipmentId:e.id}))) {
     for(const log of equipment.reliabilityLog || []) {
       if((!from || log.startDate>=from) && log.endDate<=today) logs.push({...log,equipmentId:equipment.id});
       else if(log.startDate<=today && (!from || log.endDate>=from)) partialLogs++;
