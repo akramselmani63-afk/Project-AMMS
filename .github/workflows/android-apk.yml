@@ -6,6 +6,9 @@ on:
     paths:
       - "android/**"
       - "scripts/portable.js"
+      - "scripts/build-notifications.js"
+      - "package.json"
+      - "package-lock.json"
       - "src/**"
       - "styles.css"
       - "index.html"
@@ -34,6 +37,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.9"
+      - name: Install application dependencies
+        run: npm ci
+      - name: Verify maintenance workflows and portable page
+        run: npm test
       - name: Build the offline AMMS page
         run: |
           npm run portable
