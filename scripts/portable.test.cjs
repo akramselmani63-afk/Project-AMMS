@@ -42,8 +42,11 @@ test('portable file opens records from every list', async () => {
   assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${allCount}</strong>`), 'all circle includes closed interventions');
 
   const click = async (attribute, value) => listeners.click({ target: { closest: selector => selector === `[${attribute}]` ? { dataset: { [attribute === 'data-page' ? 'page' : attribute === 'data-report-tab' ? 'reportTab' : 'action']: value, id: value } } : null } });
-  await click('data-action','toggle-kpis');
-  assert.match(app.innerHTML,/id="kpi-section"/, 'portable overview opens KPI statistics');
+  assert.match(app.innerHTML,/data-page="KPI"/, 'KPI statistics has a sliding-menu entry');
+  assert.doesNotMatch(app.innerHTML,/id="kpi-section"/, 'overview keeps KPI statistics on its own page');
+  await click('data-page','KPI');
+  assert.match(app.innerHTML,/id="kpi-section"/, 'sliding-menu entry opens the KPI page');
+  assert.match(app.innerHTML,/<h1 id="kpi-title">/, 'KPI page has its own title');
   for(const name of ['MTTR','MTBF','MTBM','MTTF']) assert.ok(app.innerHTML.includes(name));
   await click('data-action','record-reliability');
   assert.match(app.innerHTML,/name="operatingHours"/, 'portable measurements form uses shared workflow');

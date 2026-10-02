@@ -108,7 +108,7 @@ New equipment appears beside its sibling machines in the hierarchy and in all eq
 
 ### Notifications and maintenance indicators
 
-Overview → **KPI statistics** opens period and equipment/zone filters, MTTR, MTBF, MTBM, observed MTTF, closure rate, completed interventions, recorded downtime and current workload. Linked requests and work are counted once. Goey Toast provides bilingual save, failure and connection messages; its assets are bundled locally, including in the single-file prototype. Install dependencies with `npm install` before building.
+The sliding-menu **KPI statistics** page opens period and equipment/zone filters, MTTR, MTBF, MTBM, observed MTTF, closure rate, completed interventions, recorded downtime and current workload. Linked requests and work are counted once. Goey Toast provides bilingual save, failure and connection messages; its assets are bundled locally, including in the single-file prototype. Install dependencies with `npm install` before building.
 
 - MTTR is an estimate from elapsed start-to-finish time of completed corrective work, including waiting and pauses. It is not a measurement of active repair time alone.
 - MTBF = verified operating hours / failure count; MTBM = verified operating hours / all maintenance events, including preventive work.
