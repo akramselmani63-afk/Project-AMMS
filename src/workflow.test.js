@@ -104,6 +104,7 @@ test('Responsible part requests go directly to purchasing; all narrative fields 
   assert.equal(p.status,'Purchasing'); assert.equal(p.description,'');
   db.role='Purchasing Department'; f.updatePart(db,p.id,'order',{supplier:'Demo',orderReference:'DEMO-01',expectedDate:f.today()});
   assert.equal(p.quote,'');
+  db.role='Maintenance Responsible'; f.updatePart(db,p.id,'approve',{}); db.role='Purchasing Department';
   f.updatePart(db,p.id,'receive',{quantity:1,deliveryReference:'DEMO-BL'});
   db.role='Maintenance Engineer'; f.updatePart(db,p.id,'accept',{acceptedQuantity:1}); f.updatePart(db,p.id,'close',{});
   const plan=f.addPM(db,{title:'Inspect',equipmentId:'EQ-140',intervalDays:30,nextDue:f.today()}); assert.equal(plan.instructions,'');
@@ -128,6 +129,13 @@ test('purchase order keeps a PDF proforma and rejects unsafe attachments',()=>{
   assert.throws(()=>f.updatePart(db,p.id,'order',{...order,proforma:{name:'bad.html',data:'data:text/html;base64,PGgxPg=='}}),/Invalid proforma/);
   f.updatePart(db,p.id,'order',{...order,proforma:{name:'quote.pdf',data:'data:application/pdf;base64,JVBERi0='}});
   assert.equal(p.proforma.name,'quote.pdf');
+  assert.equal(p.status,'Order approval');
+  assert.throws(()=>f.updatePart(db,p.id,'receive',{quantity:1,deliveryReference:'BL'}),/stage|state|status/i);
+  assert.throws(()=>f.updatePart(db,p.id,'approve',{}),/role/);
+  db.role='Maintenance Responsible'; f.updatePart(db,p.id,'reject',{}); assert.equal(p.status,'Purchasing');
+  db.role='Purchasing Department'; f.updatePart(db,p.id,'order',{...order,proforma:p.proforma});
+  db.role='Maintenance Responsible'; f.updatePart(db,p.id,'approve',{}); assert.equal(p.status,'Ordered'); assert.equal(p.orderApproval.role,db.role);
+  db.role='Purchasing Department'; f.updatePart(db,p.id,'receive',{quantity:1,deliveryReference:'BL'}); assert.equal(p.status,'Technical acceptance');
 });
 test('v3 migration preserves approvals and data while exposing both reviewers',()=>{
   const db=f.seed({examples:true}); db.schemaVersion=3;
@@ -144,6 +152,7 @@ test('part purchase supports partial receipt, rejection/replacement and gates wo
   assert.throws(()=>f.updatePart(db,p.id,'order',{}),/role/);
   db.role='Maintenance Responsible'; f.updatePart(db,p.id,'approve',{note:'Required'});
   db.role='Purchasing Department'; f.updatePart(db,p.id,'order',{supplier:'Demo supplier',orderReference:'PO-DEMO',expectedDate:f.today(),quote:'Demo quote 30 DZD'});
+  db.role='Maintenance Responsible'; f.updatePart(db,p.id,'approve',{}); db.role='Purchasing Department';
   assert.throws(()=>f.updatePart(db,p.id,'receive',{quantity:4,deliveryReference:'BL0'}),/exceeds/);
   f.updatePart(db,p.id,'receive',{quantity:2,deliveryReference:'BL1'});
   db.role='Maintenance Engineer'; f.updatePart(db,p.id,'accept',{acceptedQuantity:1,note:'One damaged; replace'});
