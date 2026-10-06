@@ -7,7 +7,7 @@ const request = db => { db.role='Employee'; return f.addRequest(db,{title:'TEST 
 function approved(db,participants=['Maintenance Engineer']) {
   const r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P2',diagnosis:'Check bearings',risks:['Electrical / LOTO']});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Planned intervention',participants});
-  db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Isolate and verify absence of energy'});
+  db.role=f.safetyReviewer(db,r); f.reviewRequest(db,r.id,'approve',{note:'Isolate and verify absence of energy'});
   db.role='Maintenance Engineer'; return db.workOrders.find(w=>w.requestId===r.id);
 }
 const completion={actions:'Replaced bearing'};
@@ -19,7 +19,7 @@ test('requester or maintenance can remove only an unstarted, unreferenced interv
   db.actor='Amina'; f.removeIntervention(db,own.id); assert.equal(db.requests.some(r=>r.id===own.id),false);
   const linked=request(db); db.actor='Engineer'; db.role='Maintenance Engineer'; f.assess(db,linked.id,{priority:'P2'});
   db.role='Maintenance Responsible'; f.reviewRequest(db,linked.id,'approve',{});
-  db.role='HSE'; f.reviewRequest(db,linked.id,'approve',{});
+  db.role=f.safetyReviewer(db,linked); f.reviewRequest(db,linked.id,'approve',{});
   const work=db.workOrders.find(w=>w.requestId===linked.id); assert.ok(work);
   db.role='Maintenance Engineer'; assert.equal(f.canRemoveIntervention(db,linked),true);
   const part=f.addPartRequest(db,{title:'Bearing',reference:'B-1',quantity:1,neededBy:f.today(),equipmentId:work.equipmentId,workOrderId:work.id});
@@ -47,13 +47,13 @@ test('employee reports photos but cannot assess, approve, execute or purchase',(
   for(const role of ['Employee','Viewer','Purchasing Department','HSE']) assert.equal(f.can(role,'work'),false);
 });
 
-for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible','HSE']]) test('independent approval order: '+order.join(' then '),()=>{
+for(const order of [['Production Responsible','Maintenance Responsible'],['Maintenance Responsible','Production Responsible']]) test('independent approval order: '+order.join(' then '),()=>{
   const db=f.seed({examples:true}),r=request(db); db.role='Maintenance Engineer';
   f.assess(db,r.id,{priority:'P3'});
   assert.equal(r.status,'Approval review');
   assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/role/);
   for(const [index,role] of order.entries()) {
-    db.role=role; assert.equal(f.canReviewRequest(role,r),true); f.reviewRequest(db,r.id,'approve',{});
+    db.role=role; assert.equal(f.canReviewRequest(role,r,db),true); f.reviewRequest(db,r.id,'approve',{});
     assert.equal(f.canReviewRequest(role,r),false);
     assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/role/);
     if(index===0) { assert.notEqual(r.status,'Approved'); db.role='Maintenance Engineer'; assert.throws(()=>f.createWork(db,r.id,{dueDate:f.today()}),/stage/); }
@@ -63,11 +63,11 @@ for(const order of [['HSE','Maintenance Responsible'],['Maintenance Responsible'
 });
 test('return resets both approvals and requires reassessment without a mandatory reason',()=>{
   const db=f.seed({examples:true}),r=request(db); db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P1'});
-  db.role='HSE'; f.reviewRequest(db,r.id,'approve',{});
+  db.role=f.safetyReviewer(db,r); f.reviewRequest(db,r.id,'approve',{});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'return',{});
   assert.equal(r.hseApproval,undefined); assert.equal(r.status,'Returned');
   db.role='Maintenance Engineer'; f.assess(db,r.id,{priority:'P3'}); assert.equal(r.status,'Approval review');
-  db.role='HSE'; f.reviewRequest(db,r.id,'reject',{}); assert.equal(r.status,'Rejected');
+  db.role=f.safetyReviewer(db,r); f.reviewRequest(db,r.id,'reject',{}); assert.equal(r.status,'Rejected');
   assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/stage/);
 });
 test('Responsible direct order requires Engineer site assessment before HSE review',()=>{
@@ -75,12 +75,12 @@ test('Responsible direct order requires Engineer site assessment before HSE revi
   assert.throws(()=>f.issueWork(db,v),/Only/);
   db.role='Maintenance Responsible'; const w=f.issueWork(db,v),r=db.requests.find(r=>r.id===w.requestId);
   assert.equal(w.status,'Awaiting risk assessment'); assert.equal(r.status,'Site risk assessment'); assert.ok(r.approval); assert.equal(r.hseApproval,undefined);
-  db.role='HSE'; assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/stage/);
+  db.role=f.safetyReviewer(db,r); assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/stage/);
   db.role='Maintenance Responsible';
-  assert.throws(()=>f.updateWork(db,w.id,'start'),/HSE/);
+  assert.throws(()=>f.updateWork(db,w.id,'start'),/safety/);
   db.role='Maintenance Engineer'; f.submitSiteRiskAssessment(db,w.id,{risks:['Electrical / LOTO'],note:'Isolation point verified'});
   assert.equal(w.status,'Awaiting approval'); assert.equal(r.status,'HSE review'); assert.deepEqual(r.risks,['Electrical / LOTO']); assert.equal(r.siteAssessedBy,'Maintenance Engineer');
-  db.role='HSE'; f.reviewRequest(db,r.id,'approve',{}); assert.equal(w.status,'Planned');
+  db.role=f.safetyReviewer(db,r); f.reviewRequest(db,r.id,'approve',{}); assert.equal(w.status,'Planned');
   db.role='Maintenance Responsible'; f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',{repair:'Permanent'});
   assert.equal(w.confirmation,undefined); assert.equal(w.actions,''); assert.equal(w.status,'Closed');
 });
@@ -182,7 +182,7 @@ test('PM generates one open intervention and moves date when work is completed',
   assert.throws(()=>f.generatePM(db,p.id),/already/); assert.equal(p.nextDue,due);
   f.assess(db,r.id,{priority:'P3',diagnosis:'Planned inspection'});
   db.role='Maintenance Responsible'; f.reviewRequest(db,r.id,'approve',{note:'Approved'});
-  db.role='HSE'; f.reviewRequest(db,r.id,'approve',{note:'Precautions checked'});
+  db.role=f.safetyReviewer(db,r); f.reviewRequest(db,r.id,'approve',{note:'Precautions checked'});
   db.role='Maintenance Engineer'; const w=db.workOrders.find(w=>w.requestId===r.id);
   f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',completion);
   assert.equal(p.lastCompleted,f.today()); assert.notEqual(p.nextDue,due); assert.doesNotThrow(()=>f.generatePM(db,p.id));
@@ -321,3 +321,19 @@ test('notification types respect each role and employees never see internal appr
   db.role='Viewer';const viewer=f.notificationFeed(db);assert.ok(viewer.length>0);
   assert.ok(viewer.every(n=>n.status==='History' && ['Closed with work order','Accepted','Closed'].includes(n.action)));
 });
+
+ test('safety approver follows the equipment hierarchy and cannot approve other zones',()=>{
+ for(const equipmentId of ['EQ-102','EQ-140','EQ-150']) {
+  const db=f.seed();db.actor='Employee A';db.role='Employee';
+  const r=f.addRequest(db,{equipmentId,title:'Zone check'});
+  db.role='Maintenance Engineer';f.assess(db,r.id,{priority:'P2'});
+  const reviewer=equipmentId==='EQ-150'?'HSE':'Production Responsible';
+  assert.equal(f.safetyReviewer(db,r),reviewer);
+  db.role=reviewer==='HSE'?'Production Responsible':'HSE';
+  assert.throws(()=>f.reviewRequest(db,r.id,'approve',{}),/role/);
+  db.role=reviewer;f.reviewRequest(db,r.id,'approve',{});
+  assert.equal(r.hseApproval.role,reviewer);assert.notEqual(r.status,'Approved');
+  db.role='Maintenance Responsible';f.reviewRequest(db,r.id,'approve',{});
+  db.role='Maintenance Engineer';const work=db.workOrders.find(w=>w.requestId===r.id);f.updateWork(db,work.id,'start');assert.equal(work.status,'In progress');
+ }
+ });

@@ -27,14 +27,14 @@ const openingLogo = `data:image/png;base64,${(await image('assets/amms-logo-moni
 const assets = await source('src/source-assets.js', '', ['sourceTitle', 'sourceEquipment']);
 const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath', 'sortedEquipment']);
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
-  'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'seed', 'load',
+  'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'safetyReviewer', 'seed', 'load',
   'addRequest', 'canRemoveIntervention', 'removeIntervention', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
   'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'editEquipment', 'addStock', 'moveStock', 'stockBalance', 'notificationFeed', 'recordReliability', 'addPM',
   'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
 const commands = await source('src/commands.js', 'const flow = workflow;\nconst {canSeePage,workspaceForRole} = access;', ['applyCommand','recordIds','assignCreated','newRecordIds']);
 const statistics = await source('src/statistics.js', 'const {inEquipmentScope,localDay} = workflow;', ['maintenanceStats']);
-const access = await source('src/access.js', 'const {maintenanceStats} = statistics;', ['rolePages','canSeePage','workspaceForRole']);
+const access = await source('src/access.js', 'const {maintenanceStats} = statistics; const {safetyReviewer,canReviewRequest} = workflow;', ['rolePages','canSeePage','workspaceForRole']);
 const photos = await source('src/photos.js', '', ['MAX_PHOTOS', 'validatePhotos', 'readPhotos', 'readProforma']);
 const indexed = await source('src/storage.js', 'const {load, migrate} = workflow;', ['readWorkspace', 'writeWorkspace','readServerCache','writeServerCache']);
 let app = (await read('src/app.js'))

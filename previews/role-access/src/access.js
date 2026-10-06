@@ -1,7 +1,9 @@
+import {safetyReviewer,canReviewRequest} from './workflow.js';
 import {maintenanceStats} from './statistics.js';
 
 export const rolePages={
-  Employee:['Overview','KPI','Equipment','Requests','Preventive','Notifications','Profile'],
+  Employee:['Overview','Requests','Notifications','Profile'],
+  'Production Responsible':['Overview','Requests','Notifications','Profile'],
   'Maintenance Engineer':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
   'Maintenance Responsible':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
   HSE:['Overview','KPI','Equipment','Requests','Notifications','Profile'],
@@ -30,9 +32,17 @@ export function workspaceForRole(workspace,user) {
     result.requests=workspace.requests.filter(r=>user.email?r.reportedEmail===user.email:r.reportedBy===user.name).map(r=>({...pick(r,requestFields),risks:[],history:(r.history || []).filter(h=>['Submitted','Returned','Rejected','Closed','Closed with work order'].includes(h.action)).map(h=>pick(h,['at','action']))}));
     const ids=new Set(result.requests.map(r=>r.id));
     result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId)).map(w=>({...pick(w,workFields),participants:[],history:[]}));
-    result.preventive=workspace.preventive.map(p=>pick(p,['id','title','equipmentId','intervalDays','nextDue']));
+    result.preventive=[];result.publicKpis={};
     result.partRequests=[];result.inventory=[];
+  } else if(user.role==='Production Responsible') {
+    result.requests=workspace.requests.filter(r=>(user.email?r.reportedEmail===user.email:r.reportedBy===user.name) || r.reportedRole==='Employee' || canReviewRequest(user.role,r,workspace) || r.hseApproval?.role==='Production Responsible');
+    const ids=new Set(result.requests.map(r=>r.id));
+    result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId));
+    result.partRequests=[];result.inventory=[];result.preventive=[];result.publicKpis={};
   } else if(user.role==='HSE') {
+    result.requests=workspace.requests.filter(r=>safetyReviewer(workspace,r)==='HSE');
+    const ids=new Set(result.requests.map(r=>r.id));
+    result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId));
     result.partRequests=[];result.inventory=[];result.preventive=[];
   } else if(user.role==='Purchasing Department') {
     result.requests=[];result.workOrders=[];result.preventive=[];

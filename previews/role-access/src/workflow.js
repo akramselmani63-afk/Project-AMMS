@@ -1,11 +1,12 @@
 import { load as loadBase, seed as seedBase, nextId } from './data.js';
 
-export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','HSE','Purchasing Department','Viewer'];
+export const roles = ['Employee','Maintenance Engineer','Maintenance Responsible','Production Responsible','HSE','Purchasing Department','Viewer'];
 const maintenance = ['Maintenance Engineer','Maintenance Responsible'];
 export const rights = {
   Employee: ['request'],
   'Maintenance Engineer': ['request','assess','work','equipment','pm','parts','accept','report'],
   'Maintenance Responsible': ['request','assess','approve','work','equipment','pm','parts','accept','report'],
+  'Production Responsible': ['request','production-review'],
   HSE: ['hse'], 'Purchasing Department': ['purchase'], Viewer: ['view']
 };
 export const can = (role, action) => rights[role]?.includes(action) || false;
@@ -48,6 +49,10 @@ export function audit(db,item,action,note='') {
 }
 export function migrate(db) {
   db.inventory ||= [];
+  for(const r of db.requests || []) if(r.hseApproval && !['Closed','Legacy completed','Rejected'].includes(r.status) && (r.hseApproval.role || 'HSE')!==safetyReviewer(db,r)) {
+    delete r.hseApproval; delete r.precautions; r.status=approvalStatus(r);
+    for(const w of db.workOrders || []) if(w.requestId===r.id && w.status==='Planned') w.status='Awaiting approval';
+  }
   if(db.role==='Developer Admin') db.role='Viewer';
   if (db.schemaVersion >= 8) return db;
   if (db.schemaVersion >= 7) return migrateApprovedWork(db);
@@ -121,8 +126,17 @@ function migrateApprovedWork(db) {
   for(const r of db.requests) if(r.status==='Approved' && !db.workOrders.some(w=>w.requestId===r.id)) addApprovedWork(db,r);
   db.schemaVersion=8; return db;
 }
-export function canReviewRequest(role,r) {
-  return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role==='HSE' && !r.hseApproval));
+export function safetyReviewer(db,r) {
+ const seen=new Set(); let equipment=db?.equipment.find(e=>e.id===r.equipmentId);
+ while(equipment && !seen.has(equipment.id)) {
+  seen.add(equipment.id);
+  if(['production','conditionnement'].includes(equipment.name.trim().toLowerCase())) return 'Production Responsible';
+  equipment=db.equipment.find(e=>e.id===equipment.parentId);
+ }
+ return 'HSE';
+}
+export function canReviewRequest(role,r,db) {
+  return reviewStages.includes(r.status) && ((role==='Maintenance Responsible' && !r.approval) || (role===(db?safetyReviewer(db,r):'HSE') && !r.hseApproval));
 }
 
 export const seed = (options) => migrate(seedBase(options));
@@ -164,7 +178,7 @@ export function assess(db,id,v) {
 }
 export function reviewRequest(db,id,decision,v={}) {
   const r=record(db,'requests',id);
-  requireValue(canReviewRequest(db.role,r),'This role cannot review this request at this stage.');
+  requireValue(canReviewRequest(db.role,r,db),'This role cannot review this request at this stage.');
   requireValue(['approve','return','reject'].includes(decision),'Invalid decision.');
   const note=optional(v,'note');
   if(decision!=='approve') {
@@ -178,7 +192,7 @@ export function reviewRequest(db,id,decision,v={}) {
     r.workDueDate=optional(v,'dueDate') || today();
     r.approval=audit(db,r,'Responsible approval',note);
   }
-  else { r.precautions=note; r.hseApproval=audit(db,r,'HSE approval',note); }
+  else { r.precautions=note; r.hseApproval=audit(db,r,db.role==='Production Responsible'?'Production approval':'HSE approval',note); }
   r.status=approvalStatus(r);
   if(r.status==='Approved') {
     const linked=db.workOrders.filter(w=>w.requestId===id);
@@ -228,14 +242,14 @@ export function submitSiteRiskAssessment(db,id,v={}) {
   requireValue(w.participants.includes('Maintenance Engineer'),'The Maintenance Engineer must be assigned to this work order.');
   const r=record(db,'requests',w.requestId); stage(r,'Site risk assessment');
   r.risks=v.risks || []; r.diagnosis=optional(v,'note'); r.siteAssessedBy=db.actor || db.role; r.siteAssessedAt=now(); r.status='HSE review';
-  audit(db,r,'Site risk assessment submitted',r.diagnosis); w.status='Awaiting approval'; audit(db,w,'Submitted to HSE',r.id); return r;
+  audit(db,r,'Site risk assessment submitted',r.diagnosis); w.status='Awaiting approval'; audit(db,w,'Submitted to '+safetyReviewer(db,r),r.id); return r;
 }
 
 export const partsPending = (db,w) => db.partRequests.some(p=>p.workOrderId===w.id && !['Closed','Rejected','Cancelled'].includes(p.status) && p.acceptedQuantity<p.quantity);
 export function updateWork(db,id,action,v={}) {
   allow(db,'work'); const w=record(db,'workOrders',id);
   const r=record(db,'requests',w.requestId);
-  requireValue(r.hseApproval && r.status==='Approved','Recorded HSE approval is required.');
+  requireValue(r.hseApproval && (r.hseApproval.role || 'HSE')===safetyReviewer(db,r) && r.status==='Approved','Recorded safety approval is required.');
   if(action==='start') {
     stage(w,'Planned','Waiting for parts');
     requireValue(w.participants.includes(db.role),'Only an assigned maintenance participant can start work.');
@@ -333,7 +347,7 @@ export function notificationFeed(db) {
   const feed=[], maintenanceRole=maintenance.includes(db.role);
   for(const collection of ['requests','workOrders','partRequests','reports']) for(const r of db[collection] || []) {
     const own=[r.reportedBy,r.requestedBy,r.author].includes(db.actor || db.role);
-    const relevant=db.role==='Viewer' || maintenanceRole || (db.role==='Employee'?own:db.role==='Purchasing Department'?collection==='partRequests':db.role==='HSE' && ['requests','workOrders'].includes(collection));
+    const relevant=db.role==='Viewer' || maintenanceRole || (db.role==='Employee'?own:db.role==='Purchasing Department'?collection==='partRequests':db.role==='Production Responsible'?collection==='requests' && (own || r.reportedRole==='Employee' || canReviewRequest(db.role,r,db)):db.role==='HSE' && ['requests','workOrders'].includes(collection) && safetyReviewer(db,collection==='requests'?r:db.requests.find(x=>x.id===r.requestId) || r)==='HSE');
     if(!relevant) continue;
     const request=collection==='requests'?r:db.requests.find(x=>x.id===r.requestId);
     const reviewedByHSE=request?.hseApproval?.actor===(db.actor || db.role);
@@ -341,13 +355,14 @@ export function notificationFeed(db) {
       if(db.role==='Employee') return collection==='requests' && own && ['Submitted','Returned','Rejected','Closed','Closed with work order'].includes(h.action);
       if(db.role==='Viewer') return collection==='requests' && ['Closed','Closed with work order'].includes(h.action) || collection==='workOrders' && !request && h.action==='Work completed' || collection==='partRequests' && ['Accepted','Closed'].includes(h.action);
       if(db.role==='Purchasing Department') return ['Purchasing','Responsible approval','Purchase authorized','Order returned for revision','Delivery received','Technical acceptance','Partial acceptance','Accepted','Closed'].includes(h.action);
+      if(db.role==='Production Responsible') return collection==='requests' && ['Submitted','Assessed','Site risk assessment submitted','Production approval','Returned','Rejected','Closed','Closed with work order'].includes(h.action);
       if(db.role==='HSE') return ['Assessed','Site risk assessment submitted','Submitted to HSE','HSE approval'].includes(h.action) || reviewedByHSE && ['Closed','Closed with work order','Work completed'].includes(h.action);
       return maintenanceRole;
     };
     for(const h of r.history || []) if(visibleEvent(h)) feed.push({...h,id:r.id,title:r.title || r.summary || r.id,equipmentId:r.equipmentId,collection,status:'History'});
     let action='';
     if(collection==='requests') {
-      if(canReviewRequest(db.role,r)) action='Approval requested';
+      if(canReviewRequest(db.role,r,db)) action='Approval requested';
       else if(db.role==='Maintenance Engineer' && ['Submitted','Returned','Site risk assessment'].includes(r.status)) action='Assessment requested';
     }
     if(collection==='workOrders' && maintenanceRole && r.status==='Planned' && (r.participants || []).includes(db.role)) action='Approved intervention reminder';

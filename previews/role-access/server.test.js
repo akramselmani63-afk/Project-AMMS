@@ -65,7 +65,7 @@ test('company server shares records and enforces account roles',async()=>{
     const viewer=viewerLogin.cookie;
     assert.equal(viewerLogin.data.user.role,'Viewer');
     const initial=await request('/api/workspace','GET',null,employee);
-    const equipmentId=initial.data.workspace.equipment[0].id;
+    const equipmentId=initial.data.workspace.equipment.find(e=>e.id==='EQ-150').id;
     const id='IR-20260930-120000', key='11111111-1111-4111-8111-111111111111';
     const command={type:'new-request',values:{title:'Test fault',equipmentId,reportedBy:'Test Employee'},created:{equipment:[],requests:[id],workOrders:[],preventive:[],partRequests:[],reports:[]},key};
     assert.equal((await request('/api/command','POST',command,employee)).status,200);

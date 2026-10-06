@@ -111,14 +111,14 @@ test('portable file opens records from every list', async () => {
 
 test('access preview hides restricted routes, direct records and private KPI fields',async()=>{
  const {seed}=await import('../src/workflow.js');const html=readFileSync('AMMS-Access-Preview.html','utf8');const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
- for(const role of ['Employee','HSE','Purchasing Department','Maintenance Responsible','Viewer']){
+ for(const role of ['Employee','Production Responsible','HSE','Purchasing Department','Maintenance Responsible','Viewer']){
   const workspace=seed({examples:true});workspace.role=role;workspace.actor='Alice';workspace.requests[0].reportedBy='Alice';
   const app={innerHTML:'',removeAttribute(){}};const listeners={};const saved=JSON.stringify(workspace);
   const context=vm.createContext({document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},sessionStorage:{getItem:()=> '1'},localStorage:{getItem:()=>saved},indexedDB:{open(){throw Error('Unavailable')}},console:{warn(){}},structuredClone});
   vm.runInContext(script,context);await new Promise(r=>setImmediate(r));assert.match(app.innerHTML,/ACCESS PREVIEW|APERÇU DES ACCÈS/);
   const click=(page)=>listeners.click({target:{closest:s=>s==='[data-page]'?{dataset:{page}}:null}});
-  await click('KPI');assert.match(app.innerHTML,/KPI/);
-  if(role==='Employee'){assert.doesNotMatch(app.innerHTML,/data-page="Parts"|MTTR/);await click('Parts');assert.doesNotMatch(app.innerHTML,/data-page="Parts"/);await listeners.click({target:{closest:s=>s==='[data-action]'?{dataset:{action:'open',id:'partRequests:PRIVATE'}}:null}});assert.match(app.innerHTML,/Mon suivi maintenance|My maintenance overview/);}
+  await click('KPI');if(!['Employee','Production Responsible'].includes(role)) assert.match(app.innerHTML,/KPI/);
+  if(role==='Employee'){assert.doesNotMatch(app.innerHTML,/data-page="Parts"|MTTR/);await click('Parts');assert.doesNotMatch(app.innerHTML,/data-page="Parts"/);await listeners.click({target:{closest:s=>s==='[data-action]'?{dataset:{action:'open',id:'partRequests:PRIVATE'}}:null}});assert.match(app.innerHTML,/Mon historique d’interventions|My intervention history/);}
   if(role==='HSE') assert.doesNotMatch(app.innerHTML,/MTTR|Recorded downtime/);
   if(role==='Purchasing Department') assert.match(app.innerHTML,/Livraisons en retard|Late deliveries/);
  }
