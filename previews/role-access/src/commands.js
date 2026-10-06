@@ -1,7 +1,8 @@
 import * as flow from './workflow.js';
 
 // The same workflow rules run in the browser demo and on the company server.
-export function applyCommand(db, command) {
+export function applyCommand(db,command) { const result=executeCommand(db,command);flow.syncEquipmentStates(db);return result; }
+function executeCommand(db, command) {
   const {type, id, values = {}} = command;
   switch (type) {
     case 'remove-intervention': return flow.removeIntervention(db,id);

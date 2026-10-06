@@ -347,3 +347,13 @@ test('equipment operating counter keeps dated readings and validates access and 
  db.role='Employee';assert.throws(()=>f.recordCounter(db,'EQ-140',{date:'2026-01-03',hours:120}),/role/);
  assert.equal(db.equipment.find(e=>e.id==='EQ-140').runningCounter.length,2);
 });
+
+test('equipment state follows active maintenance and stopped requests without clearing overlapping stops',()=>{
+ const db=f.seed();assert.ok(db.equipment.every(e=>e.status==='Running'));
+ const e=db.equipment.find(e=>e.id==='EQ-140');
+ db.requests.push({id:'STOP1',equipmentId:e.id,status:'Submitted',impact:'Equipment stopped'},{id:'STOP2',equipmentId:e.id,status:'Submitted',impact:'Équipement arrêté'});
+ f.syncEquipmentStates(db);assert.equal(e.status,'Stopped');
+ db.workOrders.push({id:'WORK',requestId:'STOP1',equipmentId:e.id,status:'In progress'});f.syncEquipmentStates(db);assert.equal(e.status,'Under maintenance');
+ db.workOrders.at(-1).status='Closed';db.requests.at(-2).status='Closed';f.syncEquipmentStates(db);assert.equal(e.status,'Stopped');
+ db.requests.at(-1).status='Closed';f.syncEquipmentStates(db);assert.equal(e.status,'Running');
+});

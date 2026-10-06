@@ -29,7 +29,7 @@ const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
   'roles', 'rights', 'can', 'today', 'localDay', 'elapsedMinutes', 'audit', 'migrate', 'canReviewRequest', 'safetyReviewer', 'seed', 'load',
   'addRequest', 'canRemoveIntervention', 'removeIntervention', 'assess', 'reviewRequest', 'createWork', 'issueWork', 'submitSiteRiskAssessment',
-  'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'editEquipment', 'addStock', 'moveStock', 'stockBalance', 'notificationFeed', 'recordReliability', 'recordCounter', 'addPM',
+  'partsPending', 'updateWork', 'addPartRequest', 'updatePart', 'addEquipment', 'editEquipment', 'addStock', 'moveStock', 'stockBalance', 'notificationFeed', 'recordReliability', 'recordCounter', 'syncEquipmentStates', 'addPM',
   'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
 const commands = await source('src/commands.js', 'const flow = workflow;\nconst {canSeePage,workspaceForRole} = access;', ['applyCommand','recordIds','assignCreated','newRecordIds']);

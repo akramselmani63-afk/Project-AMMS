@@ -49,6 +49,7 @@ export function audit(db,item,action,note='') {
 }
 export function migrate(db) {
   db.inventory ||= [];
+  syncEquipmentStates(db);
   for(const r of db.requests || []) if(r.hseApproval && !['Closed','Legacy completed','Rejected'].includes(r.status) && (r.hseApproval.role || 'HSE')!==safetyReviewer(db,r)) {
     delete r.hseApproval; delete r.precautions; r.status=approvalStatus(r);
     for(const w of db.workOrders || []) if(w.requestId===r.id && w.status==='Planned') w.status='Awaiting approval';
@@ -313,7 +314,7 @@ export function updatePart(db,id,action,v) {
 }
 export function addEquipment(db,v) {
   allow(db,'equipment'); if(v.parentId) asset(db,v.parentId);
-  const e={id:nextId(db.equipment,'EQ'),name:required(v,'name'),reference:optional(v,'reference'),parentId:v.parentId || null,kind:v.kind || 'Machine',status:'Unknown',criticality:'Unassessed',description:v.description || '',source:'User entry — unverified'};
+  const e={id:nextId(db.equipment,'EQ'),name:required(v,'name'),reference:optional(v,'reference'),parentId:v.parentId || null,kind:v.kind || 'Machine',status:'Running',criticality:'Unassessed',description:v.description || '',source:'User entry — unverified'};
   db.equipment.push(e); return e;
 }
 export function editEquipment(db,id,v) {
@@ -467,4 +468,13 @@ export function recordCounter(db,id,v) {
  requireValue(!previous || hours>=previous.hours,'Counter cannot decrease. / Le compteur ne peut pas diminuer.');
  const reading={date,hours,delta:previous?Math.round((hours-previous.hours)*100)/100:null,actor:db.actor || db.role,role:db.role};
  (equipment.runningCounter ||= []).push(reading);audit(db,equipment,'Operating counter recorded',date+' · '+hours+' h');return reading;
+}
+
+export function syncEquipmentStates(db) {
+ if(db.accessProjection) return;
+ for(const equipment of db.equipment || []) {
+  const requests=(db.requests || []).filter(r=>r.equipmentId===equipment.id && !['Closed','Legacy completed'].includes(r.status));
+  const works=(db.workOrders || []).filter(w=>w.equipmentId===equipment.id && !['Closed','Legacy completed'].includes(w.status));
+  equipment.status=works.some(w=>w.status==='In progress')?'Under maintenance':requests.some(r=>['Equipment stopped','Équipement arrêté'].includes(r.impact))?'Stopped':'Running';
+ }
 }
