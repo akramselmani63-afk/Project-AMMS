@@ -36,15 +36,17 @@ test('portable file opens records from every list', async () => {
   const orphanWork = workspace.workOrders.filter(w => !workspace.requests.some(r => r.id === w.requestId));
   const openCount = workspace.requests.filter(r => !['Closed','Legacy completed','Rejected'].includes(workspace.workOrders.find(w => w.requestId === r.id)?.status || r.status)).length + orphanWork.filter(w => !['Closed','Legacy completed','Rejected'].includes(w.status)).length;
   const allCount = workspace.requests.length + orphanWork.length;
-  assert.match(app.innerHTML, /class="priority-donut" style="background:conic-gradient\(/, 'overview renders the priority circle');
-  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openCount}</strong>`), 'open circle includes new and preventive interventions');
-  await listeners.click({ target: { closest: selector => selector === '[data-priority-scope]' ? { dataset: { priorityScope: 'all' } } : null } });
-  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${allCount}</strong>`), 'all circle includes closed interventions');
-
+  assert.ok(!app.innerHTML.includes('class="priority-donut"'));
   const click = async (attribute, value) => listeners.click({ target: { closest: selector => selector === `[${attribute}]` ? { dataset: { [attribute === 'data-page' ? 'page' : attribute === 'data-report-tab' ? 'reportTab' : 'action']: value, id: value } } : null } });
   assert.match(app.innerHTML,/data-page="KPI"/, 'KPI statistics has a sliding-menu entry');
   assert.doesNotMatch(app.innerHTML,/id="kpi-section"/, 'overview keeps KPI statistics on its own page');
   await click('data-page','KPI');
+  assert.match(app.innerHTML, /class="priority-donut" style="background:conic-gradient\(/, 'KPI renders the priority circle');
+  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openCount}</strong>`), 'open circle includes new and preventive interventions');
+  await listeners.click({ target: { closest: selector => selector === '[data-priority-scope]' ? { dataset: { priorityScope: 'all' } } : null } });
+  assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${allCount}</strong>`), 'all circle includes closed interventions');
+
+
   assert.match(app.innerHTML,/id="kpi-section"/, 'sliding-menu entry opens the KPI page');
   assert.match(app.innerHTML,/<h1 id="kpi-title">/, 'KPI page has its own title');
   for(const name of ['MTTR']) assert.ok(app.innerHTML.includes(name));
