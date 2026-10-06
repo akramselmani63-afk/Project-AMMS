@@ -552,3 +552,6 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .kpi-backlog-row .kpi-workload>div{height:100%}
 .kpi-backlog-row .kpi-downtime{display:flex;flex-direction:column;justify-content:flex-start}
 .kpi-backlog-row .kpi-downtime p{max-width:60ch}
+
+.kpi-backlog-row .kpi-downtime{background:#e6f2e9}
+
