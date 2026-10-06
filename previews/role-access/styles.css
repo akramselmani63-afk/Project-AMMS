@@ -531,3 +531,5 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .access-preview-banner{padding:10px 14px;margin-bottom:20px;border-radius:8px;background:#e7f2eb;color:#145332;font-weight:700;font-size:14px}
 
 @media (max-width:700px){.kpi-filters,.kpi-workload,.kpi-role-bento{grid-template-columns:1fr}.kpi-reliability{grid-template-columns:1fr}.kpi-reliability>div,.kpi-reliability>div:nth-child(2),.kpi-reliability>div:nth-child(3){grid-column:auto;padding:20px}.kpi-workload>div,.kpi-downtime{padding:20px}.kpi-measurements{padding:16px}.kpi-bento>.panel-head .button{width:100%}}
+
+.kpi-bento>.pulse-panel{background:#fff;margin-bottom:16px;border-radius:16px}.kpi-bento .kpi-reliability>div{grid-column:1/-1}

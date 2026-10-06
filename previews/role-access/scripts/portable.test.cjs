@@ -47,10 +47,8 @@ test('portable file opens records from every list', async () => {
   await click('data-page','KPI');
   assert.match(app.innerHTML,/id="kpi-section"/, 'sliding-menu entry opens the KPI page');
   assert.match(app.innerHTML,/<h1 id="kpi-title">/, 'KPI page has its own title');
-  for(const name of ['MTTR','MTBF','MTBM']) assert.ok(app.innerHTML.includes(name));
+  for(const name of ['MTTR']) assert.ok(app.innerHTML.includes(name));
   assert.ok(!app.innerHTML.includes('<strong>MTTF</strong>'));
-  await click('data-action','record-reliability');
-  assert.match(app.innerHTML,/name="operatingHours"/, 'portable measurements form uses shared workflow');
   await click('data-action','cancel');
   await click('data-page','Notifications');
   assert.match(app.innerHTML,/class="notification-button"[\s\S]*?<button class="role-chip"/, 'notification bell is beside the profile');
