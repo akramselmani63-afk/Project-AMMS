@@ -543,3 +543,12 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .kpi-backlog-row .kpi-downtime p{margin:0}
 .kpi-backlog-row .kpi-workload dd{margin-top:8px}
 .kpi-backlog-row .kpi-workload small{margin-top:4px}@media(max-width:700px){.kpi-backlog-row{grid-template-columns:1fr}}
+
+/* Keep the secondary KPI tiles in two compact, aligned rows. */
+.kpi-summary>.kpi-workload>div:first-child,.kpi-summary>.kpi-workload>div:last-child{grid-column:auto;padding:18px}
+.kpi-summary .kpi-workload dt,.kpi-backlog-row .kpi-downtime h3{font-size:20px;line-height:1.4}
+.kpi-summary>.kpi-workload dd{margin-top:8px}
+.kpi-backlog-row{align-items:stretch}
+.kpi-backlog-row .kpi-workload>div{height:100%}
+.kpi-backlog-row .kpi-downtime{display:flex;flex-direction:column;justify-content:flex-start}
+.kpi-backlog-row .kpi-downtime p{max-width:60ch}
