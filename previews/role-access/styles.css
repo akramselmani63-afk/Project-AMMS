@@ -599,7 +599,7 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .failure-trend .failure-chart-svg { min-width:0;width:100%; }
 @media(max-width:640px) { .failure-trend { padding:16px; } }
 
-.failure-trend { background:#f5efe3; }
+.failure-trend { background:#f5f6f7; }
 .failure-trend .kpi-filters { display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) minmax(0,1fr);align-items:end;gap:12px; }
 .failure-trend .kpi-filters .field { min-width:0;width:auto; }
 .failure-trend .kpi-filters input,.failure-trend .kpi-filters select { width:100%;min-width:0; }
