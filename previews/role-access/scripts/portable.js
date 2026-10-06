@@ -33,8 +33,8 @@ const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: s
   'generatePM', 'addReport', 'inEquipmentScope', 'reportActivities', 'interventionReports', 'approveReport', 'interventionProgressStep', 'statusMatches'
 ]);
 const commands = await source('src/commands.js', 'const flow = workflow;\nconst {canSeePage,workspaceForRole} = access;', ['applyCommand','recordIds','assignCreated','newRecordIds']);
-const statistics = await source('src/statistics.js', 'const {inEquipmentScope,localDay} = workflow;', ['maintenanceStats']);
-const access = await source('src/access.js', 'const {maintenanceStats} = statistics; const {safetyReviewer,canReviewRequest} = workflow;', ['rolePages','canSeePage','workspaceForRole']);
+const statistics = await source('src/statistics.js', 'const {inEquipmentScope,localDay} = workflow;', ['maintenanceStats','equipmentFailureTrend']);
+const access = await source('src/access.js', 'const {maintenanceStats,equipmentFailureTrend} = statistics; const {safetyReviewer,canReviewRequest} = workflow;', ['rolePages','canSeePage','workspaceForRole']);
 const photos = await source('src/photos.js', '', ['MAX_PHOTOS', 'validatePhotos', 'readPhotos', 'readProforma']);
 const indexed = await source('src/storage.js', 'const {load, migrate} = workflow;', ['readWorkspace', 'writeWorkspace','readServerCache','writeServerCache']);
 let app = (await read('src/app.js'))
@@ -76,7 +76,7 @@ const storage = (() => {
   return {readWorkspace, writeWorkspace};
 })();`;
 
-const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst statistics = ${statistics};\nconst access = ${access};\nconst commandsModule = ${commands};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {maintenanceStats} = statistics;\nconst {applyCommand,recordIds,assignCreated,newRecordIds} = commandsModule;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readServerCache,writeServerCache} = indexed;\nconst {readPhotos,readProforma} = photosModule;\nconst {canSeePage,workspaceForRole}=access;\n${app}\n})();`;
+const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst statistics = ${statistics};\nconst access = ${access};\nconst commandsModule = ${commands};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {maintenanceStats,equipmentFailureTrend} = statistics;\nconst {applyCommand,recordIds,assignCreated,newRecordIds} = commandsModule;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readServerCache,writeServerCache} = indexed;\nconst {readPhotos,readProforma} = photosModule;\nconst {canSeePage,workspaceForRole}=access;\n${app}\n})();`;
 const notifications = await read('assets/notifications.js');
 const css = (await read('assets/notifications.css')) + (await read('styles.css')).replaceAll("./assets/agridiam-logo.png", logo);
 const startup = `const showStartupError = event => { const app = document.getElementById('app'); if (app && !app.querySelector('.shell')) { const message = event.reason?.message || event.message || 'Unknown startup error'; app.innerHTML = '<main style="font:16px Arial,sans-serif;padding:32px;max-width:700px"><h1>AMMS could not open / AMMS ne peut pas démarrer</h1><p>' + String(message).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</p></main>'; app.removeAttribute('inert'); document.getElementById('splash')?.remove(); } }; window.addEventListener('error', showStartupError); window.addEventListener('unhandledrejection', showStartupError);`;

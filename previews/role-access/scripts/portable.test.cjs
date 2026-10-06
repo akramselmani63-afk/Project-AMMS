@@ -49,6 +49,7 @@ test('portable file opens records from every list', async () => {
 
   assert.match(app.innerHTML,/id="kpi-section"/, 'sliding-menu entry opens the KPI page');
   assert.match(app.innerHTML,/<h1 id="kpi-title">/, 'KPI page has its own title');
+  await listeners.change({target:{dataset:{kpiFilter:'equipment'},value:workspace.equipment[0].id}});assert.match(app.innerHTML,/failure-chart/);
   for(const name of ['MTTR']) assert.ok(app.innerHTML.includes(name));
   assert.ok(!app.innerHTML.includes('<strong>MTTF</strong>'));
   await click('data-action','cancel');
