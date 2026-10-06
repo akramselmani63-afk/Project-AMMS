@@ -570,3 +570,5 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 .overview-layout .purchasing-panel{background:#fff}
 
+
+.notification-button.is-clear{color:#116b3b;border-color:#b7d7c3;background:#edf6f0}.notification-button.is-clear:hover,.notification-button.is-clear[aria-current=page]{background:#e6f2e9;border-color:#116b3b}

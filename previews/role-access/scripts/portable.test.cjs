@@ -53,7 +53,7 @@ test('portable file opens records from every list', async () => {
   assert.ok(!app.innerHTML.includes('<strong>MTTF</strong>'));
   await click('data-action','cancel');
   await click('data-page','Notifications');
-  assert.match(app.innerHTML,/class="notification-button"[\s\S]*?<button class="role-chip"/, 'notification bell is beside the profile');
+  assert.match(app.innerHTML,/class="notification-button [^"]*"[\s\S]*?<button class="role-chip"/, 'notification bell is beside the profile');
   assert.match(app.innerHTML,/class="notification-count"/, 'pending actions have a count badge');
   assert.match(app.innerHTML,/popovertarget="notification-drawer"/, 'bell targets the floating drawer');
   assert.match(app.innerHTML,/id="notification-drawer"[^>]*popover="auto"/, 'drawer has native outside-click and Escape dismissal');
