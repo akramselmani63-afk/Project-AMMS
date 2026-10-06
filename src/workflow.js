@@ -47,6 +47,7 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
+  db.inventory ||= [];
   if(db.role==='Developer Admin') db.role='Viewer';
   if (db.schemaVersion >= 8) return db;
   if (db.schemaVersion >= 7) return migrateApprovedWork(db);
@@ -298,8 +299,54 @@ export function updatePart(db,id,action,v) {
 }
 export function addEquipment(db,v) {
   allow(db,'equipment'); if(v.parentId) asset(db,v.parentId);
-  const e={id:nextId(db.equipment,'EQ'),name:required(v,'name'),parentId:v.parentId || null,kind:v.kind || 'Machine',status:'Unknown',criticality:'Unassessed',description:v.description || '',source:'User entry — unverified'};
+  const e={id:nextId(db.equipment,'EQ'),name:required(v,'name'),reference:optional(v,'reference'),parentId:v.parentId || null,kind:v.kind || 'Machine',status:'Unknown',criticality:'Unassessed',description:v.description || '',source:'User entry — unverified'};
   db.equipment.push(e); return e;
+}
+export function editEquipment(db,id,v) {
+  allow(db,'equipment'); const e=record(db,'equipment',id);
+  const parentId=v.parentId || null;
+  if(parentId) asset(db,parentId);
+  let parent=db.equipment.find(x=>x.id===parentId); const seen=new Set([id]);
+  while(parent) { requireValue(!seen.has(parent.id),'Equipment cannot be its own ancestor. / Un équipement ne peut pas être son propre parent.'); seen.add(parent.id); parent=db.equipment.find(x=>x.id===parent.parentId); }
+  requireValue(['Area','Line','System','Machine','Component'].includes(v.kind),'Invalid equipment type.');
+  const name=required(v,'name');
+  Object.assign(e,{name,reference:optional(v,'reference'),parentId,kind:v.kind,description:optional(v,'description')});
+  audit(db,e,'Equipment modified'); return e;
+}
+export function addStock(db,v) {
+  allow(db,can(db.role,'equipment')?'equipment':'purchase');
+  const reference=required(v,'reference');
+  requireValue(!db.inventory.some(x=>x.reference.toLowerCase()===reference.toLowerCase()),'This stock reference already exists. / Cette référence existe déjà en stock.');
+  const item={id:nextId(db.inventory,'STK'),name:required(v,'name'),reference,unit:required(v,'unit'),location:optional(v,'location'),minimum:number(v.minimum),movements:[],history:[]};
+  audit(db,item,'Stock item created'); db.inventory.push(item); return item;
+}
+export const stockBalance=item=>(item.movements || []).reduce((sum,m)=>sum+(m.type==='in'?m.quantity:-m.quantity),0);
+export function moveStock(db,id,v) {
+  allow(db,can(db.role,'equipment')?'equipment':'purchase');
+  const item=record(db,'inventory',id), quantity=number(v.quantity);
+  requireValue(quantity>0 && ['in','out'].includes(v.type),'Enter a positive stock quantity and direction. / Saisissez une quantité positive et un sens de mouvement.');
+  if(v.type==='out') { allow(db,'equipment'); requireValue(quantity<=stockBalance(item),'Insufficient stock. / Stock insuffisant.'); }
+  const movement={type:v.type,quantity,at:now(),actor:db.actor || db.role,role:db.role,note:optional(v,'note')};
+  item.movements.push(movement); audit(db,item,v.type==='in'?'Stock received':'Stock issued',movement.note); return item;
+}
+export function notificationFeed(db) {
+  const feed=[], maintenanceRole=maintenance.includes(db.role);
+  for(const collection of ['requests','workOrders','partRequests','reports']) for(const r of db[collection] || []) {
+    const own=[r.reportedBy,r.requestedBy,r.author].includes(db.actor || db.role);
+    const relevant=db.role==='Viewer' || maintenanceRole || (db.role==='Employee'?own:db.role==='Purchasing Department'?collection==='partRequests':db.role==='HSE' && ['requests','workOrders'].includes(collection));
+    if(!relevant) continue;
+    for(const h of r.history || []) feed.push({...h,id:r.id,title:r.title || r.summary || r.id,equipmentId:r.equipmentId,collection,status:'History'});
+    let action='';
+    if(collection==='requests') {
+      if(canReviewRequest(db.role,r)) action='Approval requested';
+      else if(db.role==='Maintenance Engineer' && ['Submitted','Returned','Site risk assessment'].includes(r.status)) action='Assessment requested';
+    }
+    if(collection==='workOrders' && maintenanceRole && r.status==='Planned' && (r.participants || []).includes(db.role)) action='Approved intervention reminder';
+    if(collection==='partRequests' && db.role==='Maintenance Responsible' && ['Responsible review','Order approval'].includes(r.status)) action=r.status==='Order approval'?'Purchase approval requested':'Approval requested';
+    if(collection==='partRequests' && db.role==='Purchasing Department' && ['Purchasing','Ordered','Partial acceptance'].includes(r.status)) action='Purchasing action required';
+    if(action) feed.push({id:r.id,title:r.title || r.id,equipmentId:r.equipmentId,collection,status:'Pending',action,at:r.createdAt || '',actor:'',role:''});
+  }
+  return feed.sort((a,b)=>Number(b.status==='Pending')-Number(a.status==='Pending') || String(b.at).localeCompare(String(a.at)));
 }
 export function addPM(db,v) {
   allow(db,'pm'); asset(db,v.equipmentId); const intervalDays=number(v.intervalDays,1); requireValue(Number.isInteger(intervalDays),'Interval must be whole days.');

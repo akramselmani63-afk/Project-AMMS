@@ -267,3 +267,37 @@ test('status tabs include existing new, approval-pending and historical closed r
  assert.equal(rows.filter(r=>f.statusMatches(r,'Closed')).length,2);
  assert.equal(rows.filter(r=>f.statusMatches(r,'Approved')).length,1);
 });
+
+test('equipment edits preserve links and reject a cyclic hierarchy',()=>{
+  const db=f.seed(); db.role='Maintenance Engineer';
+  const zone=f.addEquipment(db,{name:'Zone test',kind:'Area'});
+  const e=f.addEquipment(db,{name:'Pump',kind:'Machine',parentId:zone.id,reference:'P-1'});
+  const r=f.addRequest(db,{title:'Leak',equipmentId:e.id,reportedBy:'Engineer'});
+  f.editEquipment(db,e.id,{name:'Pump updated',kind:'Machine',parentId:zone.id,reference:'P-2',description:'Updated'});
+  assert.equal(r.equipmentId,e.id); assert.equal(e.reference,'P-2');
+  assert.throws(()=>f.editEquipment(db,zone.id,{name:'Zone',kind:'Area',parentId:e.id}),/ancestor/);
+  db.role='Employee'; assert.throws(()=>f.editEquipment(db,e.id,{name:'Changed',kind:'Machine'}),/role/);
+});
+test('inventory persists audited movements, permissions and nonnegative balances',async()=>{
+  const {applyCommand,recordIds,newRecordIds,assignCreated}=await import('./commands.js');
+  const db=f.seed(); db.role='Purchasing Department'; const before=recordIds(db);
+  const item=applyCommand(db,{type:'new-stock',values:{name:'Bearing',reference:'6204',unit:'pcs',minimum:2}});
+  const ids=newRecordIds(db,before); assignCreated(db,before,ids); assert.match(item.id,/^STK-[a-f0-9]{32}$/);
+  f.moveStock(db,item.id,{type:'in',quantity:5,note:'BL-01'});
+  assert.throws(()=>f.moveStock(db,item.id,{type:'out',quantity:1}),/role/);
+  db.role='Maintenance Engineer'; f.moveStock(db,item.id,{type:'out',quantity:2});
+  assert.equal(f.stockBalance(item),3); assert.equal(item.movements.length,2);
+  assert.throws(()=>f.moveStock(db,item.id,{type:'out',quantity:4}),/Insufficient/);
+  assert.throws(()=>f.addStock(db,{name:'Duplicate',reference:'6204',unit:'pcs'}),/already exists/);
+  assert.equal(f.stockBalance(f.migrate(JSON.parse(JSON.stringify(db))).inventory[0]),3);
+  db.role='Viewer'; assert.throws(()=>f.moveStock(db,item.id,{type:'in',quantity:1}),/role/);
+});
+test('notification reminders follow approval and completion while events remain',()=>{
+  const db=f.seed({examples:true}), w=approved(db);
+  assert.ok(f.notificationFeed(db).some(n=>n.id===w.id && n.action==='Approved intervention reminder'));
+  f.updateWork(db,w.id,'start'); f.updateWork(db,w.id,'complete',{actions:'Repaired',completedAt:new Date().toISOString()});
+  const feed=f.notificationFeed(db);
+  assert.ok(!feed.some(n=>n.id===w.id && n.status==='Pending'));
+  assert.ok(feed.some(n=>n.id===w.id && n.action==='Work completed' && n.status==='History'));
+  db.role='Employee'; db.actor='Unrelated person'; assert.equal(f.notificationFeed(db).length,0);
+});

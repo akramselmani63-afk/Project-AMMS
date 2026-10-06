@@ -133,3 +133,8 @@ Automated tests cover role gates, Engineer site-risk submission, HSE review, bot
 ## Prototype boundary
 
 Company server mode includes shared file-backed records, real accounts and server-side workflow checks, but has no email verification, protected immutable audit log, remote notifications, automatic content translation or digital signatures. Finalized records are read-only through this UI. Before operational deployment, IT must set up HTTPS, access rules, service monitoring and backups, then test recovery and AGRIDIAM must validate the procedures and source data. The server's JSON storage is intended for the initial 20–25 user pilot; move to a transactional database if concurrent write volume or reporting needs grow.
+
+## Equipment, stock and notifications
+- Equipment can be modified by maintenance without changing its ID or linked records. References are optional on every level of the hierarchy.
+- Stock starts empty. Maintenance and Purchasing can create items and record receipts; only maintenance can issue stock. Quantities come from dated, attributed movements, with negative balances blocked. Purchasing workflows do not automatically add stock.
+- Notification history reuses saved workflow events. Current approval, assessment, approved-work and purchasing reminders are generated from the current state and scoped to the user's role. No email delivery or scheduled external reminders are enabled.

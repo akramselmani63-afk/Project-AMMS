@@ -51,6 +51,20 @@ test('portable file opens records from every list', async () => {
   await click('data-action','record-reliability');
   assert.match(app.innerHTML,/name="operatingHours"/, 'portable measurements form uses shared workflow');
   await click('data-action','cancel');
+  await click('data-page','Notifications');
+  assert.match(app.innerHTML,/notification-list/, 'notification history opens');
+  assert.match(app.innerHTML,/data-filter="Pending"/, 'notifications expose pending reminders');
+  await click('data-page','Inventory');
+  await click('data-action','new-stock');
+  assert.match(app.innerHTML,/name="reference"/, 'stock item form has a reference');
+  assert.match(app.innerHTML,/name="minimum"/, 'stock item form has a minimum level');
+  await click('data-action','cancel');
+  await click('data-page','Equipment');
+  assert.match(app.innerHTML,/data-action="edit-equipment"/, 'equipment register has Modify buttons');
+  await listeners.click({ target: { closest: selector => selector === '[data-action]' ? { dataset: { action: 'edit-equipment', id: workspace.equipment[0].id } } : null } });
+  assert.match(app.innerHTML,/name="reference"/, 'equipment edit form has a reference');
+  assert.match(app.innerHTML,/name="parentId"/, 'equipment edit form keeps hierarchy');
+  await click('data-action','cancel');
   const open = async (page, action, collection) => {
     await click('data-page', page);
     const id = app.innerHTML.match(new RegExp(`data-action="${action}" data-id="${collection}:([^"]+)"`))?.[1];
