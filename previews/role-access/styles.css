@@ -555,3 +555,6 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 .kpi-backlog-row .kpi-downtime{background:#e6f2e9}
 
+
+.kpi-total-downtime{background:#fbe8d4}.kpi-total-downtime h2,.kpi-total-downtime .kpi-value{color:#82420f}.kpi-total-downtime p{color:#70451f}
+
