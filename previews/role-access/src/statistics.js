@@ -66,18 +66,18 @@ export function equipmentFailureTrend(db,equipmentId,period,annual=false,now=new
  const year=Number(period.slice(0,4)),month=annual?0:Number(period.slice(5,7))-1;
  if(!Number.isInteger(year) || year<2000 || year>2200 || !Number.isInteger(month) || month<0 || month>11) return [];
  const boundary=(m,d=1)=>Date.UTC(year,m,d)-3600000;
- const intervals=db.requests.filter(r=>r.equipmentId===equipmentId && ['Equipment stopped','Équipement arrêté','Running with a fault','Fonctionne avec anomalie'].includes(r.impact)).flatMap(r=>{
+ const intervals=db.requests.filter(r=>(!equipmentId || r.equipmentId===equipmentId || inEquipmentScope(db,r.equipmentId,equipmentId)) && ['Equipment stopped','Équipement arrêté','Running with a fault','Fonctionne avec anomalie'].includes(r.impact)).flatMap(r=>{
   const start=Date.parse(r.createdAt),work=db.workOrders.find(w=>w.requestId===r.id);
   const closed=['Closed','Legacy completed'].includes(r.status) || work?.status==='Closed';
   const end=closed?Date.parse(work?.completedAt || (r.history || []).findLast(h=>['Closed','Closed with work order'].includes(h.action))?.at):now.getTime();
-  return Number.isFinite(start) && Number.isFinite(end) && end>start?[{start,end:Math.min(end,now.getTime()),stopped:['Equipment stopped','Équipement arrêté'].includes(r.impact)}]:[];
+  return Number.isFinite(start) && Number.isFinite(end) && end>start?[{equipmentId:r.equipmentId,start,end:Math.min(end,now.getTime()),stopped:['Equipment stopped','Équipement arrêté'].includes(r.impact)}]:[];
  });
  const count=annual?12:new Date(Date.UTC(year,month+1,0)).getUTCDate();
  return Array.from({length:count},(_,i)=>{
   const start=annual?boundary(i):boundary(month,i+1),end=annual?boundary(i+1):boundary(month,i+2);
   const clips=intervals.filter(r=>r.start<end && r.end>start).map(r=>({...r,start:Math.max(start,r.start),end:Math.min(end,r.end)}));
   const points=[...new Set(clips.flatMap(r=>[r.start,r.end]))].sort((a,b)=>a-b);let stopped=0,anomaly=0;
-  for(let j=1;j<points.length;j++) {const active=clips.filter(r=>r.start<points[j] && r.end>points[j-1]);const duration=(points[j]-points[j-1])/3600000;if(active.some(r=>r.stopped)) stopped+=duration;else if(active.length) anomaly+=duration;}
+  for(let j=1;j<points.length;j++) {const active=clips.filter(r=>r.start<points[j] && r.end>points[j-1]);const duration=(points[j]-points[j-1])/3600000;for(const id of new Set(active.map(r=>r.equipmentId))) {const records=active.filter(r=>r.equipmentId===id);if(records.some(r=>r.stopped)) stopped+=duration;else anomaly+=duration;}}
   return {label:i+1,stopped:stopped/(annual?24:1),anomaly:anomaly/(annual?24:1)};
  });
 }
