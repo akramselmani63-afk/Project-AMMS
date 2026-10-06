@@ -52,6 +52,9 @@ test('portable file opens records from every list', async () => {
   assert.match(app.innerHTML,/name="operatingHours"/, 'portable measurements form uses shared workflow');
   await click('data-action','cancel');
   await click('data-page','Notifications');
+  assert.match(app.innerHTML,/class="notification-button"[\s\S]*?<button class="role-chip"/, 'notification bell is beside the profile');
+  assert.match(app.innerHTML,/class="notification-count"/, 'pending actions have a count badge');
+  assert.doesNotMatch(app.innerHTML,/<button class="nav-item[^>]*data-page="Notifications"/, 'notification entry moved out of the sidebar');
   assert.match(app.innerHTML,/notification-list/, 'notification history opens');
   assert.match(app.innerHTML,/data-filter="Pending"/, 'notifications expose pending reminders');
   await click('data-page','Inventory');

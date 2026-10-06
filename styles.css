@@ -472,3 +472,7 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .notification-list .mini-row>div{flex:1 1 280px;min-width:0}
 .notification-list strong,.notification-list p{overflow-wrap:anywhere}
 .notification-list small{display:block;margin-top:6px}
+.notification-button{position:relative;display:inline-grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid #cad8e2;border-radius:7px;background:#fff;color:#124e80}
+.notification-button svg{width:23px;height:23px}
+.notification-button:hover,.notification-button[aria-current=page]{background:#e8f2ed;border-color:#18894f}
+.notification-count{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:#116b3b;color:#fff;font-size:11px;font-weight:700;line-height:19px}
