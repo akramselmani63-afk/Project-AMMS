@@ -457,3 +457,14 @@ export function statusMatches(item,filter) {
   if(filter==='Closed') return ['Closed','Legacy completed'].includes(item.status);
   return item.status===filter;
 }
+
+export function recordCounter(db,id,v) {
+ allow(db,'equipment'); const equipment=record(db,'equipment',id);
+ required(v,'hours'); const hours=number(v.hours),date=required(v,'date');
+ requireValue(/^\d{4}-\d{2}-\d{2}$/.test(date) && localDay(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0,10)===date && date<=today(),'Enter a valid reading date. / Saisissez une date de relevé valide.');
+ const readings=equipment.runningCounter || [],previous=readings.at(-1);
+ requireValue(!previous || date>previous.date,'Choose a date after the last reading. / Choisissez une date après le dernier relevé.');
+ requireValue(!previous || hours>=previous.hours,'Counter cannot decrease. / Le compteur ne peut pas diminuer.');
+ const reading={date,hours,delta:previous?Math.round((hours-previous.hours)*100)/100:null,actor:db.actor || db.role,role:db.role};
+ (equipment.runningCounter ||= []).push(reading);audit(db,equipment,'Operating counter recorded',date+' · '+hours+' h');return reading;
+}

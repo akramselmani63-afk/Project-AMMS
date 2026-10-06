@@ -337,3 +337,13 @@ test('notification types respect each role and employees never see internal appr
   db.role='Maintenance Engineer';const work=db.workOrders.find(w=>w.requestId===r.id);f.updateWork(db,work.id,'start');assert.equal(work.status,'In progress');
  }
  });
+
+test('equipment operating counter keeps dated readings and validates access and monotonic hours',()=>{
+ const db=f.seed();db.role='Maintenance Engineer';
+ f.recordCounter(db,'EQ-140',{date:'2026-01-01',hours:100});
+ const r=f.recordCounter(db,'EQ-140',{date:'2026-01-02',hours:112.5});assert.equal(r.delta,12.5);
+ assert.throws(()=>f.recordCounter(db,'EQ-140',{date:'2026-01-03',hours:110}),/decrease/);
+ assert.throws(()=>f.recordCounter(db,'EQ-140',{date:'2025-12-31',hours:120}),/after/);
+ db.role='Employee';assert.throws(()=>f.recordCounter(db,'EQ-140',{date:'2026-01-03',hours:120}),/role/);
+ assert.equal(db.equipment.find(e=>e.id==='EQ-140').runningCounter.length,2);
+});

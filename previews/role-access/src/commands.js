@@ -21,6 +21,7 @@ export function applyCommand(db, command) {
     case 'edit-equipment': return flow.editEquipment(db,id,values);
     case 'new-stock': return flow.addStock(db,values);
     case 'stock-move': return flow.moveStock(db,id,values);
+    case 'record-counter': return flow.recordCounter(db,id,values);
     case 'record-reliability': return flow.recordReliability(db,values);
     case 'new-pm': return flow.addPM(db,values);
     case 'new-report': return flow.addReport(db,values);
