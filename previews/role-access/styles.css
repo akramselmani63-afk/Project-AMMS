@@ -572,3 +572,6 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 
 .notification-button.is-clear{color:#116b3b;border-color:#b7d7c3;background:#edf6f0}.notification-button.is-clear:hover,.notification-button.is-clear[aria-current=page]{background:#e6f2e9;border-color:#116b3b}
+
+.equipment-register .equipment-children>.equipment-node{border:1px solid #c8d8e5;border-radius:10px;margin:12px 0;overflow:hidden;background:#fff}.equipment-register>.equipment-node>summary{background:#e6f2e9}.equipment-register .equipment-children>.equipment-node>summary{background:#edf3f9}.equipment-register .equipment-children .equipment-children>.equipment-node>summary{background:#f4f7fa}.equipment-register .equipment-node[open]>summary{border-bottom:1px solid #c8d8e5}.equipment-register .equipment-children{border-left:1px solid #9db8cd;padding-left:16px}.equipment-register .equipment-node-body{padding-top:16px}
+
