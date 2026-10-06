@@ -593,3 +593,8 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .failure-chart-svg .chart-stopped { fill:#a52b27; }
 .failure-chart-svg .chart-group:focus { outline:none; }
 .failure-chart-svg .chart-group:focus rect,.failure-chart-svg .chart-group:hover rect { stroke:#173d60;stroke-width:2; }
+
+.failure-trend { border:1px solid #d6e3eb;border-radius:20px;background:#fff;box-shadow:0 8px 24px rgba(23,61,96,.09);padding:24px; }
+.failure-trend .failure-chart-scroll { overflow:visible;min-width:0;padding:0; }
+.failure-trend .failure-chart-svg { min-width:0;width:100%; }
+@media(max-width:640px) { .failure-trend { padding:16px; } }
