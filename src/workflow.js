@@ -335,7 +335,16 @@ export function notificationFeed(db) {
     const own=[r.reportedBy,r.requestedBy,r.author].includes(db.actor || db.role);
     const relevant=db.role==='Viewer' || maintenanceRole || (db.role==='Employee'?own:db.role==='Purchasing Department'?collection==='partRequests':db.role==='HSE' && ['requests','workOrders'].includes(collection));
     if(!relevant) continue;
-    for(const h of r.history || []) feed.push({...h,id:r.id,title:r.title || r.summary || r.id,equipmentId:r.equipmentId,collection,status:'History'});
+    const request=collection==='requests'?r:db.requests.find(x=>x.id===r.requestId);
+    const reviewedByHSE=request?.hseApproval?.actor===(db.actor || db.role);
+    const visibleEvent=h=>{
+      if(db.role==='Employee') return collection==='requests' && own && ['Submitted','Returned','Rejected','Closed','Closed with work order'].includes(h.action);
+      if(db.role==='Viewer') return collection==='requests' && ['Closed','Closed with work order'].includes(h.action) || collection==='workOrders' && !request && h.action==='Work completed' || collection==='partRequests' && ['Accepted','Closed'].includes(h.action);
+      if(db.role==='Purchasing Department') return ['Purchasing','Responsible approval','Purchase authorized','Order returned for revision','Delivery received','Technical acceptance','Partial acceptance','Accepted','Closed'].includes(h.action);
+      if(db.role==='HSE') return ['Assessed','Site risk assessment submitted','Submitted to HSE','HSE approval'].includes(h.action) || reviewedByHSE && ['Closed','Closed with work order','Work completed'].includes(h.action);
+      return maintenanceRole;
+    };
+    for(const h of r.history || []) if(visibleEvent(h)) feed.push({...h,id:r.id,title:r.title || r.summary || r.id,equipmentId:r.equipmentId,collection,status:'History'});
     let action='';
     if(collection==='requests') {
       if(canReviewRequest(db.role,r)) action='Approval requested';

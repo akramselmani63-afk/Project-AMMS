@@ -301,3 +301,23 @@ test('notification reminders follow approval and completion while events remain'
   assert.ok(feed.some(n=>n.id===w.id && n.action==='Work completed' && n.status==='History'));
   db.role='Employee'; db.actor='Unrelated person'; assert.equal(f.notificationFeed(db).length,0);
 });
+
+test('notification types respect each role and employees never see internal approvals',()=>{
+  const db=f.seed();
+  const histories=['Submitted','Assessed','Responsible approval','HSE approval','Returned','Rejected','Closed with work order'].map(action=>({action,actor:'Reviewer',role:'HSE',at:'2026-10-06T09:00:00Z'}));
+  db.requests=[{id:'IR-OWN',title:'Own intervention',reportedBy:'Employee A',status:'Closed',hseApproval:{actor:'Safety A'},history:histories},{id:'IR-OTHER',title:'Other intervention',reportedBy:'Employee B',status:'Approval review',history:histories}];
+  db.workOrders=[];db.partRequests=[{id:'SPR-1',title:'Bearing',status:'Order approval',history:['Purchase requested','Order submitted for approval','Purchase authorized','Order returned for revision','Delivery received','Accepted','Closed'].map(action=>({action,at:'2026-10-06T09:00:00Z'}))}];db.reports=[];
+  db.role='Employee';db.actor='Employee A';
+  const employee=f.notificationFeed(db);assert.ok(employee.some(n=>n.action==='Closed with work order'));
+  assert.ok(employee.every(n=>n.id==='IR-OWN' && ['Submitted','Returned','Rejected','Closed with work order'].includes(n.action)));
+  db.role='Maintenance Engineer';assert.ok(f.notificationFeed(db).some(n=>n.action==='Responsible approval'));
+  assert.ok(!f.notificationFeed(db).some(n=>n.action==='Approval requested'));
+  db.role='Maintenance Responsible';assert.ok(f.notificationFeed(db).some(n=>n.id==='SPR-1' && n.action==='Purchase approval requested'));
+  assert.ok(f.notificationFeed(db).some(n=>n.id==='IR-OTHER' && n.action==='Approval requested'));
+  db.role='HSE';db.actor='Safety A';assert.ok(f.notificationFeed(db).some(n=>n.id==='IR-OWN' && n.action==='Closed with work order'));
+  db.actor='Safety B';assert.ok(!f.notificationFeed(db).some(n=>n.action==='Closed with work order'));
+  db.role='Purchasing Department';assert.ok(f.notificationFeed(db).every(n=>n.collection==='partRequests'));
+  assert.ok(!f.notificationFeed(db).some(n=>n.action==='Order submitted for approval'));
+  db.role='Viewer';const viewer=f.notificationFeed(db);assert.ok(viewer.length>0);
+  assert.ok(viewer.every(n=>n.status==='History' && ['Closed with work order','Accepted','Closed'].includes(n.action)));
+});
