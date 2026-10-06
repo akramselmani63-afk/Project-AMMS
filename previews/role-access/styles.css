@@ -567,3 +567,6 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 .approval-panel{background:#fbe9e7}.approval-count,.notification-count{background:#a52b27;color:#fff}.approval-panel .review-queue-row{border-bottom-color:#e9c6c2}.approval-panel .panel-head p,.approval-panel .review-queue-row small,.approval-panel .review-queue-empty{color:#75413b}.approval-panel .review-queue-arrow{color:#a52b27}.approval-panel .review-queue-row:focus-visible{outline-color:#a52b27}.notification-button{color:#a52b27;border-color:#e9c6c2;background:#fff4f2}.notification-button:hover,.notification-button[aria-current=page]{background:#fbe9e7;border-color:#a52b27}
 
+
+.overview-layout .purchasing-panel{background:#fff}
+
