@@ -54,6 +54,9 @@ test('portable file opens records from every list', async () => {
   await click('data-page','Notifications');
   assert.match(app.innerHTML,/class="notification-button"[\s\S]*?<button class="role-chip"/, 'notification bell is beside the profile');
   assert.match(app.innerHTML,/class="notification-count"/, 'pending actions have a count badge');
+  assert.match(app.innerHTML,/popovertarget="notification-drawer"/, 'bell targets the floating drawer');
+  assert.match(app.innerHTML,/id="notification-drawer"[^>]*popover="auto"/, 'drawer has native outside-click and Escape dismissal');
+  assert.match(app.innerHTML,/popovertargetaction="hide"/, 'drawer has a close button');
   assert.doesNotMatch(app.innerHTML,/<button class="nav-item[^>]*data-page="Notifications"/, 'notification entry moved out of the sidebar');
   assert.match(app.innerHTML,/notification-list/, 'notification history opens');
   assert.match(app.innerHTML,/data-filter="Pending"/, 'notifications expose pending reminders');
