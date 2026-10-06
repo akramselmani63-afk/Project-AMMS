@@ -575,3 +575,6 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 .equipment-register .equipment-children>.equipment-node{border:1px solid #c8d8e5;border-radius:10px;margin:12px 0;overflow:hidden;background:#fff}.equipment-register>.equipment-node>summary{background:#e6f2e9}.equipment-register .equipment-children>.equipment-node>summary{background:#edf3f9}.equipment-register .equipment-children .equipment-children>.equipment-node>summary{background:#f4f7fa}.equipment-register .equipment-node[open]>summary{border-bottom:1px solid #c8d8e5}.equipment-register .equipment-children{border-left:1px solid #9db8cd;padding-left:16px}.equipment-register .equipment-node-body{padding-top:16px}
 
+
+.equipment-register>.equipment-node{border:0;box-shadow:0 6px 20px #17345112;margin:18px 0}.equipment-register .equipment-children>.equipment-node{border:0;box-shadow:0 4px 14px #17345114;margin:14px 0}.equipment-register .equipment-children{border-left:0;padding-left:18px}.equipment-register .equipment-node[open]>summary{border-bottom:0}.equipment-register .equipment-node>summary{transition:background .18s ease-out}.equipment-register .equipment-node-body{padding-bottom:22px}@media(max-width:700px){.equipment-register .equipment-children{padding-left:8px}}
+
