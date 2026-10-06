@@ -431,42 +431,60 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
   #print-area .intervention-footer{margin-top:3px;padding-top:2px;font-size:8px}
 }
 /* KPI section stays optional; values share the app's readable blue/green palette. */
+
+/* KPI bento: reliability tiles, operational counts and a downtime ranking. */
 .kpi-section{margin-bottom:24px;scroll-margin-top:90px}
-.kpi-filters{display:grid;grid-template-columns:minmax(140px,1fr) minmax(240px,3fr);gap:16px;margin:20px 0}
-.kpi-reliability{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:0;border:1px solid #d7e2e9;border-radius:8px;overflow:hidden}
-.kpi-reliability>div{padding:20px;border-right:1px solid #d7e2e9}
-.kpi-reliability>div:last-child{border-right:0}
-.kpi-reliability dt strong{font-size:19px;color:#103f75;display:block}
-.kpi-reliability dt span{display:block;font-size:15px;line-height:1.5;min-height:46px;color:#465e6d}
-.kpi-reliability dd{margin:10px 0 0;font-size:15px}
-.kpi-reliability .kpi-value{font-size:32px;font-weight:700;color:#103f75;font-variant-numeric:tabular-nums}
-.kpi-sample{color:#405e53;min-height:24px}
-.kpi-section summary{cursor:pointer;color:#103f75;font-size:16px;line-height:1.5}
-.kpi-section details p,.kpi-note{font-size:15px;line-height:1.6;color:#465e6d}
-.kpi-section details p{margin:10px 0}
-.kpi-note{margin:16px 0 24px}
-.kpi-summary{display:grid;grid-template-columns:1.2fr 1fr;gap:28px}
-.kpi-workload{margin:0}
-.kpi-workload>div{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;padding:14px 0;border-bottom:1px solid #d7e2e9}
-.kpi-workload dt{font-size:16px;line-height:1.5}
-.kpi-workload dd{margin:0}
-.kpi-workload dd strong{display:block;color:#103f75;font-size:24px;font-variant-numeric:tabular-nums}
-.kpi-workload small{display:block;font-size:14px;line-height:1.5;color:#465e6d}
-.kpi-downtime h3{font-size:19px;margin:12px 0}
-.kpi-downtime ol{padding-left:22px}
-.kpi-downtime li{padding:12px 0;border-bottom:1px solid #d7e2e9;font-size:16px;line-height:1.5}
-.kpi-downtime li strong{display:block;color:#103f75;font-size:21px}
-.kpi-downtime p{font-size:16px;line-height:1.6;color:#465e6d}
-.kpi-measurements{margin-top:24px;padding-top:20px;border-top:1px solid #d7e2e9}
+.kpi-bento>.panel-head{align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:24px}
+.kpi-bento h1{margin:0 0 8px;font-size:clamp(28px,3vw,40px);line-height:1.15}
+.kpi-bento>.panel-head p{margin:0;color:#465e6d;overflow-wrap:anywhere}
+.kpi-filters{display:grid;grid-template-columns:minmax(140px,1fr) minmax(240px,3fr);gap:16px;margin:20px 0 24px}
+.kpi-reliability{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;margin:0}
+.kpi-reliability>div{grid-column:span 5;padding:24px;border-radius:16px;background:#e6f2e9;min-width:0}
+.kpi-reliability>div:nth-child(2),.kpi-reliability>div:nth-child(3){grid-column:span 7}
+.kpi-reliability>div:first-child{background:#123f70;color:#fff}
+.kpi-reliability>div:nth-child(3){background:#e9f2fa}
+.kpi-reliability>div:nth-child(4){background:#f3eddf}
+.kpi-reliability dt strong{display:block;font-size:22px;color:#103f75;margin-bottom:4px}
+.kpi-reliability dt span{display:block;font-size:16px;line-height:1.5;color:#35576a}
+.kpi-reliability dd{margin:12px 0 0;font-size:16px}
+.kpi-reliability .kpi-value{font-size:clamp(36px,4vw,48px);font-weight:700;line-height:1.15;color:#103f75;font-variant-numeric:tabular-nums}
+.kpi-sample{color:#35576a}
+.kpi-section summary{cursor:pointer;color:#103f75;font-size:16px;line-height:1.5;min-height:44px;display:flex;align-items:center;gap:8px}
+.kpi-section summary::before{content:'+';font-weight:700;flex:none}
+.kpi-section details[open]>summary::before{content:'−'}
+.kpi-section details p,.kpi-note{font-size:16px;line-height:1.6;color:#465e6d}
+.kpi-section details p{margin:10px 0;max-width:70ch}
+.kpi-reliability>div:first-child dt strong,.kpi-reliability>div:first-child .kpi-value,.kpi-reliability>div:first-child summary{color:#fff}
+.kpi-reliability>div:first-child dt span,.kpi-reliability>div:first-child .kpi-sample,.kpi-reliability>div:first-child details p{color:#d9e9f7}
+.kpi-note{margin:24px 0;max-width:90ch}
+.kpi-summary{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start}
+.kpi-workload{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0}
+.kpi-workload>div{padding:24px;border-radius:16px;background:#fff;min-width:0}
+.kpi-workload>div:first-child{grid-column:1/-1;background:#e6f2e9}
+.kpi-workload>div:nth-child(4){background:#e9f2fa}
+.kpi-workload dt{font-size:17px;font-weight:600;line-height:1.5;color:#173451}
+.kpi-workload dd{margin:12px 0 0}
+.kpi-workload dd strong{display:block;color:#103f75;font-size:36px;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi-workload small{display:block;margin-top:8px;font-size:16px;line-height:1.5;color:#465e6d}
+.kpi-downtime{padding:24px;border-radius:16px;background:#e9f2fa;min-width:0}
+.kpi-downtime h3{font-size:21px;line-height:1.4;margin:0 0 20px}
+.kpi-downtime ol{padding-left:24px;margin:0}
+.kpi-downtime li{padding:16px 0;border-bottom:1px solid #c4d6e5;font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+.kpi-downtime li:last-child{border-bottom:0}
+.kpi-downtime li strong{display:block;color:#103f75;font-size:24px;margin-top:8px}
+.kpi-downtime p{font-size:16px;line-height:1.6;color:#35576a}
+.kpi-measurements{margin-top:24px;padding:20px 24px;border-radius:16px;background:#fff;min-width:0}
 .kpi-measurements table{margin-top:16px}
+.kpi-measurements .table-wrap{overflow-x:auto}
 .kpi-measurements td small{display:block;white-space:nowrap}
+.kpi-role-bento{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.kpi-role-bento .stat:first-child{grid-column:1/-1;min-height:170px;justify-content:space-between}
+.kpi-role-bento .stat-number{font-size:40px}
+@media(max-width:1000px){.kpi-summary{grid-template-columns:1fr}}
 .amms-toast-title{font-size:18px!important;color:#103f75!important}
 .amms-toast-description{font-size:16px!important;line-height:1.5!important;color:#29414e!important}
 .amms-toast-dismiss{font-size:15px!important;min-height:36px}
 [data-sonner-toaster]{z-index:10000!important}
-@media(max-width:1100px){.kpi-reliability{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-reliability>div:nth-child(2){border-right:0}.kpi-reliability>div:nth-child(-n+2){border-bottom:1px solid #d7e2e9}}
-@media(max-width:700px){.kpi-filters,.kpi-summary{grid-template-columns:1fr}.kpi-reliability>div{padding:16px}.kpi-reliability .kpi-value{font-size:28px}.kpi-reliability dt span{min-height:68px}.kpi-workload>div{grid-template-columns:1.15fr 1fr}.kpi-measurements .table-wrap{overflow-x:auto}.kpi-section .panel-head{flex-wrap:wrap;gap:14px}}
-@media(max-width:360px){.kpi-reliability{grid-template-columns:1fr}.kpi-reliability>div{border-right:0;border-bottom:1px solid #d7e2e9}.kpi-reliability dt span{min-height:0}}
 @media(prefers-reduced-motion:reduce){#amms-notifications *,[data-sonner-toaster] *{animation:none!important;transition:none!important}}
 .notification-list .mini-row{align-items:flex-start;gap:14px;flex-wrap:wrap}
 .notification-list .mini-row>div{flex:1 1 280px;min-width:0}
@@ -507,3 +525,5 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 @media(max-width:1100px){.overview-layout{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-layout .work-panel{grid-column:1/-1}.overview-layout .pulse-panel,.overview-layout .intake-panel,.overview-layout .prevention-panel,.overview-layout .purchasing-panel{grid-column:span 1}}
 @media(max-width:700px){.overview-layout{grid-template-columns:minmax(0,1fr)}.overview-layout .panel{grid-column:1}.notification-drawer{inset:76px 12px auto 12px;width:auto}}
 .access-preview-banner{padding:10px 14px;margin-bottom:20px;border-radius:8px;background:#e7f2eb;color:#145332;font-weight:700;font-size:14px}
+
+@media (max-width:700px){.kpi-filters,.kpi-workload,.kpi-role-bento{grid-template-columns:1fr}.kpi-reliability{grid-template-columns:1fr}.kpi-reliability>div,.kpi-reliability>div:nth-child(2),.kpi-reliability>div:nth-child(3){grid-column:auto;padding:20px}.kpi-workload>div,.kpi-downtime{padding:20px}.kpi-measurements{padding:16px}.kpi-bento>.panel-head .button{width:100%}}
