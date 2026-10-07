@@ -12,9 +12,10 @@ test('portable file opens records from every list', async () => {
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const listeners = {};
   const app = { innerHTML: '', removeAttribute() {} };
+  const printArea={innerHTML:'',classList:{add(){},remove(){}},querySelector:()=>({focus(){}})};
   const document = {
     documentElement: {}, body: { classList: { toggle() {} } },
-    querySelector: selector => selector === '#app' ? app : null,
+    querySelector: selector => selector === '#app' ? app : selector === '#print-area' ? printArea : null,
     addEventListener: (name, handler) => { listeners[name] = handler; }
   };
   let saved;
@@ -31,6 +32,7 @@ test('portable file opens records from every list', async () => {
   context.workspace = workspace;
   vm.runInContext('workflow.generatePM(workspace, workspace.preventive[0].id)', context);
   workspace.partRequests.push({ id: 'SP-TEST', title: 'Test part', equipmentId: workspace.equipment[0].id, status: 'Purchasing', reference: 'REF-1', quantity: 1, unit: 'pcs', acceptedQuantity: 0, rejectedQuantity: 0, deliveries: [], photos: [] });
+  workspace.partRequests.push({...workspace.partRequests[0],id:'SP-SECOND',title:'Second part'});
   saved = JSON.stringify(workspace);
   await new Promise(resolve => setImmediate(resolve));
   const orphanWork = workspace.workOrders.filter(w => !workspace.requests.some(r => r.id === w.requestId));
@@ -87,6 +89,18 @@ test('portable file opens records from every list', async () => {
   assert.match(app.innerHTML, /data-record-filter="equipment"/, 'interventions filter by equipment');
   assert.match(app.innerHTML, /data-record-filter="origin"/, 'interventions filter by source');
   await open('Parts', 'open', 'partRequests');
+  await click('data-action','print');
+  assert.match(printArea.innerHTML,/STATEMENT OF REQUIREMENTS|ÉTAT DES BESOINS/);
+  assert.match(printArea.innerHTML,/REF-1/);
+  assert.doesNotMatch(printArea.innerHTML,/record-panel|wizard-panel/);
+  await click('data-action','close-print');
+  await click('data-page','Parts');
+  assert.match(app.innerHTML,/data-part-select="SP-TEST"/);
+  await listeners.change({target:{dataset:{partSelect:'SP-TEST'},checked:true}});
+  await listeners.change({target:{dataset:{partSelect:workspace.partRequests.find(r=>r.id!=='SP-TEST').id},checked:true}});
+  await click('data-action','print-parts');
+  assert.match(printArea.innerHTML,/GROUPED STATEMENT OF REQUIREMENTS|ÉTAT DES BESOINS GROUPÉ/);
+
   await click('data-page', 'Parts');
   assert.match(app.innerHTML, /data-record-filter="priority"/, 'parts filter by priority');
   await open('Preventive', 'open', 'preventive');
