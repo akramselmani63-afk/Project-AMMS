@@ -648,3 +648,24 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .notification-history-content small { color:#4b6475;font-size:14px; }
 .notification-history-status { display:flex;align-items:center;gap:12px; }
 @media(max-width:700px) { .notification-history-list { padding:16px; }.notification-history-row { grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:16px 10px; }.notification-history-time { grid-column:1/-1; }.notification-history-filters .field { width:100%; } }
+
+/* Desktop overview uses the viewport; long queues scroll within their cards. */
+@media(min-width:1101px) {
+ .overview-screen { height:100dvh;overflow:hidden; }
+ .overview-screen .main { height:100dvh;display:flex;flex-direction:column; }
+ .overview-screen .topbar { flex-shrink:0; }
+ .overview-screen .content { flex:1;min-height:0;width:100%;margin:0 auto;padding:20px 30px;display:flex;flex-direction:column;gap:16px; }
+ .overview-screen .overview-heading,.overview-screen .page-heading { flex-shrink:0;margin:0; }
+ .overview-screen h1 { font-size:32px; }
+ .overview-screen .overview-heading p { margin-bottom:0; }
+ .overview-screen .overview-stats { flex-shrink:0;margin:0; }
+ .overview-screen .overview-stats .stat { min-height:100px;padding:16px 20px; }
+ .overview-screen .overview-stats .stat-number { font-size:36px; }
+ .overview-screen .overview-layout { flex:1;min-height:0;grid-template-rows:repeat(2,minmax(0,1fr));gap:16px; }
+ .overview-screen .overview-layout .panel,.overview-screen .role-overview-layout .panel { min-height:0;overflow:auto;overscroll-behavior:contain;padding:20px; }
+ .overview-screen .overview-layout:not(.with-approvals) .work-panel { grid-column:1/-1; }
+ .overview-screen .role-overview-layout { flex:1;min-height:0;margin-top:0; }
+ .overview-screen .panel-head { margin-bottom:12px; }
+ .overview-screen .panel-head p { margin-bottom:0; }
+ .overview-screen .empty { padding:20px; }
+}
