@@ -513,7 +513,8 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .overview-stats .stat+.stat{border-left:0}
 .overview-stats .stat:nth-child(1){background:#123f70;color:#fff}
 .overview-stats .stat:nth-child(2){background:#e6f2e9}
-.overview-stats .stat:nth-child(3){background:#e9f2fa}
+.overview-stats .stat:nth-child(3){background:#e6f2e9}
+.overview-stats .stat:nth-child(3) .stat-number{color:#116b3b}
 .overview-stats .stat:nth-child(4){background:#f3eddf}
 .overview-stats .stat span,.overview-stats .stat small{color:#35576a}
 .overview-stats .stat:nth-child(1) span,.overview-stats .stat:nth-child(1) small,.overview-stats .stat:nth-child(1) .stat-number{color:#fff}
@@ -611,7 +612,7 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .overview-stats .stat:first-child,.kpi-reliability>div:first-child { border-color:#305c82; }
 
 /* Keep card outlines consistent despite individual section border overrides. */
-.panel,.stat,.pm-card,.document-card,.report,.intervention-report-card,.signin-card,.choice-card,.kpi-reliability>div,.kpi-workload>div,.kpi-downtime,.kpi-total-downtime,.kpi-measurements,.equipment-register .equipment-node { border:1px solid #000 !important; box-shadow:0 6px 18px rgba(23,52,81,.12) !important; }
+.panel,.stat,.pm-card,.document-card,.report,.intervention-report-card,.signin-card,.choice-card,.kpi-reliability>div,.kpi-workload>div,.kpi-downtime,.kpi-total-downtime,.kpi-measurements,.equipment-register .equipment-node { border:1px solid #d5dfe5 !important; box-shadow:0 6px 18px rgba(23,52,81,.12) !important; }
 
 /* Keep navigation controls visible at every screen size. */
 .topbar { position:sticky;top:0;z-index:8; }
@@ -622,3 +623,14 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .intervention-link-row { cursor:pointer; }
 .intervention-link-row:hover { background:#edf4f9; }
 .intervention-title-link { padding:0;border:0;background:transparent;color:#123f70;font-weight:700;text-align:left;text-decoration:underline;text-underline-offset:3px; }
+
+/* Empty approval queues stay neutral; red remains the cue for pending action. */
+.approval-panel.is-clear{background:#fff}
+.approval-panel.is-clear .approval-count{background:#edf1f4;color:#486373}
+.approval-panel.is-clear .panel-head p,.approval-panel.is-clear .review-queue-empty{color:#486373}
+
+.notification-drawer { overflow:hidden; }
+.notification-drawer:popover-open { display:flex;flex-direction:column; }
+.notification-drawer-head,.notification-drawer>.button { flex-shrink:0; }
+.notification-drawer-list { min-height:0;overflow-y:auto;overscroll-behavior:contain; }
+.notification-drawer>.button { background:#fff; }
