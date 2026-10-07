@@ -357,3 +357,9 @@ test('equipment state follows active maintenance and stopped requests without cl
  db.workOrders.at(-1).status='Closed';db.requests.at(-2).status='Closed';f.syncEquipmentStates(db);assert.equal(e.status,'Stopped');
  db.requests.at(-1).status='Closed';f.syncEquipmentStates(db);assert.equal(e.status,'Running');
 });
+
+test('low stock reminders reach only maintenance and clear after replenishment',()=>{
+ const db=f.seed();db.inventory=[{id:'STK-1',name:'Bearing',reference:'BR-1',unit:'pcs',minimum:2,movements:[{type:'in',quantity:2,at:'2026-10-07T08:00:00Z'}]}];
+ for(const role of ['Maintenance Engineer','Maintenance Responsible','Employee','HSE','Purchasing Department','Viewer','Production Responsible']) { db.role=role;const alerts=f.notificationFeed(db).filter(n=>n.action==='Low stock');assert.equal(alerts.length,['Maintenance Engineer','Maintenance Responsible'].includes(role)?1:0);if(alerts.length)assert.equal(alerts[0].collection,'inventory'); }
+ db.role='Maintenance Engineer';db.inventory[0].movements.push({type:'in',quantity:1});assert.equal(f.notificationFeed(db).filter(n=>n.action==='Low stock').length,0);
+});

@@ -371,6 +371,7 @@ export function notificationFeed(db) {
     if(collection==='partRequests' && db.role==='Purchasing Department' && ['Purchasing','Ordered','Partial acceptance'].includes(r.status)) action='Purchasing action required';
     if(action) feed.push({id:r.id,title:r.title || r.id,equipmentId:r.equipmentId,collection,status:'Pending',action,at:r.createdAt || '',actor:'',role:''});
   }
+  if(maintenanceRole) for(const item of db.inventory || []) if(stockBalance(item)<=item.minimum) feed.push({id:item.id,title:item.name+' · '+item.reference+' · '+stockBalance(item)+' / '+item.minimum+' '+item.unit,collection:'inventory',status:'Pending',action:'Low stock',at:item.movements?.at(-1)?.at || item.history?.at(-1)?.at || '',actor:'',role:''});
   return feed.sort((a,b)=>Number(b.status==='Pending')-Number(a.status==='Pending') || String(b.at).localeCompare(String(a.at)));
 }
 export function addPM(db,v) {
