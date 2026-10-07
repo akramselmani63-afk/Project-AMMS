@@ -652,8 +652,8 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 /* Aurora motion stays behind the existing brand artwork. */
 .splash { overflow:hidden;isolation:isolate;background:#f8fafb; }
-.splash::before,.splash::after { content:'';position:absolute;inset:-45%;z-index:-1;pointer-events:none;filter:blur(45px);background:repeating-linear-gradient(110deg,transparent 0%,rgba(13,77,139,.16) 12%,rgba(40,152,85,.14) 24%,rgba(110,181,218,.18) 36%,transparent 48%);background-size:200% 100%;animation:amms-aurora 12s ease-in-out infinite alternate; }
+.splash::before,.splash::after { content:'';position:absolute;inset:-45%;z-index:-1;pointer-events:none;filter:blur(45px);background:repeating-linear-gradient(110deg,transparent 0%,rgba(13,77,139,.16) 12%,rgba(40,152,85,.14) 24%,rgba(110,181,218,.18) 36%,transparent 48%);background-size:200% 100%;animation:amms-aurora 3s linear infinite alternate; }
 .splash::after { opacity:.5;transform:rotate(180deg);animation-direction:alternate-reverse; }
 .splash-content { position:relative; }
-@keyframes amms-aurora { from { background-position:0% 50%;transform:translate3d(-4%,0,0) rotate(-8deg); } to { background-position:100% 50%;transform:translate3d(4%,2%,0) rotate(8deg); } }
+@keyframes amms-aurora { from { background-position:0% 50%;transform:translate3d(-12%,-4%,0) rotate(-12deg); } to { background-position:100% 50%;transform:translate3d(12%,4%,0) rotate(12deg); } }
 @media(prefers-reduced-motion:reduce) { .splash::before,.splash::after { animation:none; } }
