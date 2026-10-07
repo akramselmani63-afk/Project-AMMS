@@ -366,7 +366,7 @@ test('low stock reminders reach only maintenance and clear after replenishment',
 
 test('stock threshold events persist after replenishment without repeated low events',()=>{
  const db=f.seed();db.role='Maintenance Engineer';db.actor='Akram';const item=f.addStock(db,{name:'Bearing',reference:'TRACE-1',unit:'pcs',minimum:2});
- f.moveStock(db,item.id,{type:'in',quantity:1});assert.equal(item.history.filter(h=>h.action==='Low stock detected').length,1);
+ f.moveStock(db,item.id,{type:'in',quantity:1});assert.equal(item.history.filter(h=>h.action==='Low stock detected').length,1);assert.equal(f.notificationFeed(db).filter(n=>['Low stock','Low stock detected'].includes(n.action)).length,1);
  f.moveStock(db,item.id,{type:'in',quantity:3});let feed=f.notificationFeed(db);assert.equal(feed.filter(n=>n.action==='Low stock').length,0);assert.equal(feed.filter(n=>n.action==='Low stock detected').length,1);const restored=feed.find(n=>n.action==='Stock replenished');assert.equal(restored.actor,'Akram');assert.match(restored.title,/1 → 4/);
  f.moveStock(db,item.id,{type:'out',quantity:3});assert.equal(item.history.filter(h=>h.action==='Low stock detected').length,2);
 });

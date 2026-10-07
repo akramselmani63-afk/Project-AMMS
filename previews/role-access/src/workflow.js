@@ -377,8 +377,9 @@ export function notificationFeed(db) {
     if(action) feed.push({id:r.id,title:r.title || r.id,equipmentId:r.equipmentId,collection,status:'Pending',action,at:r.createdAt || '',actor:'',role:''});
   }
   if(maintenanceRole) for(const item of db.inventory || []) {
-    for(const h of item.history || []) if(['Low stock detected','Stock replenished'].includes(h.action)) feed.push({...h,id:item.id,title:item.name+' · '+item.reference+' · '+h.note,collection:'inventory',status:'History'});
-    if(stockBalance(item)<=item.minimum) feed.push({id:item.id,title:item.name+' · '+item.reference+' · '+stockBalance(item)+' / '+item.minimum+' '+item.unit,collection:'inventory',status:'Pending',action:'Low stock',at:item.movements?.at(-1)?.at || item.history?.at(-1)?.at || '',actor:'',role:''});
+    const low=stockBalance(item)<=item.minimum,lastLow=(item.history || []).findLast(h=>h.action==='Low stock detected');
+    for(const h of item.history || []) if(['Low stock detected','Stock replenished'].includes(h.action) && !(low && h===lastLow)) feed.push({...h,id:item.id,title:item.name+' · '+item.reference+' · '+h.note,collection:'inventory',status:'History'});
+    if(low) feed.push({id:item.id,title:item.name+' · '+item.reference+' · '+stockBalance(item)+' / '+item.minimum+' '+item.unit,collection:'inventory',status:'Pending',action:'Low stock',at:lastLow?.at || item.movements?.at(-1)?.at || item.history?.at(-1)?.at || '',actor:lastLow?.actor || '',role:lastLow?.role || ''});
   }
   return feed.sort((a,b)=>Number(b.status==='Pending')-Number(a.status==='Pending') || String(b.at).localeCompare(String(a.at)));
 }
