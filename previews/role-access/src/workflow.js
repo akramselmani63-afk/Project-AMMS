@@ -333,7 +333,7 @@ export function addStock(db,v) {
   const reference=required(v,'reference');
   requireValue(!db.inventory.some(x=>x.reference.toLowerCase()===reference.toLowerCase()),'This stock reference already exists. / Cette référence existe déjà en stock.');
   const item={id:nextId(db.inventory,'STK'),name:required(v,'name'),reference,unit:required(v,'unit'),location:optional(v,'location'),minimum:number(v.minimum),movements:[],history:[]};
-  audit(db,item,'Stock item created'); db.inventory.push(item); return item;
+  audit(db,item,'Stock item created'); audit(db,item,'Low stock detected','0 / '+item.minimum+' '+item.unit); db.inventory.push(item); return item;
 }
 export const stockBalance=item=>(item.movements || []).reduce((sum,m)=>sum+(m.type==='in'?m.quantity:-m.quantity),0);
 export function moveStock(db,id,v) {
@@ -342,7 +342,12 @@ export function moveStock(db,id,v) {
   requireValue(quantity>0 && ['in','out'].includes(v.type),'Enter a positive stock quantity and direction. / Saisissez une quantité positive et un sens de mouvement.');
   if(v.type==='out') { allow(db,'equipment'); requireValue(quantity<=stockBalance(item),'Insufficient stock. / Stock insuffisant.'); }
   const movement={type:v.type,quantity,at:now(),actor:db.actor || db.role,role:db.role,note:optional(v,'note')};
-  item.movements.push(movement); audit(db,item,v.type==='in'?'Stock received':'Stock issued',movement.note); return item;
+  const before=stockBalance(item),wasLow=before<=item.minimum;
+  item.movements.push(movement); audit(db,item,v.type==='in'?'Stock received':'Stock issued',movement.note);
+  const after=stockBalance(item),isLow=after<=item.minimum;
+  if(!wasLow && isLow || wasLow && !(item.history || []).some(h=>h.action==='Low stock detected')) audit(db,item,'Low stock detected',before+' → '+after+' '+item.unit+'; minimum: '+item.minimum);
+  if(wasLow && !isLow) audit(db,item,'Stock replenished',before+' → '+after+' '+item.unit+'; minimum: '+item.minimum);
+  return item;
 }
 export function notificationFeed(db) {
   const feed=[], maintenanceRole=maintenance.includes(db.role);
@@ -371,7 +376,10 @@ export function notificationFeed(db) {
     if(collection==='partRequests' && db.role==='Purchasing Department' && ['Purchasing','Ordered','Partial acceptance'].includes(r.status)) action='Purchasing action required';
     if(action) feed.push({id:r.id,title:r.title || r.id,equipmentId:r.equipmentId,collection,status:'Pending',action,at:r.createdAt || '',actor:'',role:''});
   }
-  if(maintenanceRole) for(const item of db.inventory || []) if(stockBalance(item)<=item.minimum) feed.push({id:item.id,title:item.name+' · '+item.reference+' · '+stockBalance(item)+' / '+item.minimum+' '+item.unit,collection:'inventory',status:'Pending',action:'Low stock',at:item.movements?.at(-1)?.at || item.history?.at(-1)?.at || '',actor:'',role:''});
+  if(maintenanceRole) for(const item of db.inventory || []) {
+    for(const h of item.history || []) if(['Low stock detected','Stock replenished'].includes(h.action)) feed.push({...h,id:item.id,title:item.name+' · '+item.reference+' · '+h.note,collection:'inventory',status:'History'});
+    if(stockBalance(item)<=item.minimum) feed.push({id:item.id,title:item.name+' · '+item.reference+' · '+stockBalance(item)+' / '+item.minimum+' '+item.unit,collection:'inventory',status:'Pending',action:'Low stock',at:item.movements?.at(-1)?.at || item.history?.at(-1)?.at || '',actor:'',role:''});
+  }
   return feed.sort((a,b)=>Number(b.status==='Pending')-Number(a.status==='Pending') || String(b.at).localeCompare(String(a.at)));
 }
 export function addPM(db,v) {
