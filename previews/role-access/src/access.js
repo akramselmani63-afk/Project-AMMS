@@ -11,7 +11,7 @@ export const rolePages={
 export const canSeePage=(role,page)=>(rolePages[role] || []).includes(page);
 const pick=(item,fields)=>Object.fromEntries(fields.filter(key=>key in item).map(key=>[key,item[key]]));
 const equipmentFields=['id','name','parentId','kind','reference','status','criticality','description','source','sourceCell'];
-const requestFields=['id','title','equipmentId','description','status','priority','reportedBy','reportedRole','reportedEmail','createdAt','createdBy','photos'];
+const requestFields=['id','title','equipmentId','description','status','priority','reportedBy','reportedRole','reportedJob','reportedEmail','createdAt','createdBy','photos'];
 const workFields=['id','requestId','title','equipmentId','priority','status','dueDate','startedAt','completedAt','downtimeMinutes','type','pmId'];
 export function workspaceForRole(workspace,user) {
   if(workspace.accessProjection) return workspace;

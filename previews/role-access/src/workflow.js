@@ -44,7 +44,7 @@ const asset = (db,id) => requireValue(db.equipment.some(x=>x.id===id),'Select va
 const allow = (db,action) => requireValue(can(db.role,action),'This role cannot perform this action.');
 const stage = (item,...states) => requireValue(states.includes(item.status),'This action is unavailable at this stage.');
 export function audit(db,item,action,note='') {
-  const event={at:now(),role:db.role,actor:db.actor || db.role,action,note};
+  const event={at:now(),role:db.role,job:db.actorJob || '',actor:db.actor || db.role,action,note};
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
@@ -145,7 +145,7 @@ export const load = storage => migrate(loadBase(storage));
 export function addRequest(db,v) {
   allow(db,'request'); asset(db,v.equipmentId);
   const createdAt=now();
-  const r={id:requestIdAt(createdAt,db.requests),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:db.actor || required(v,'reportedBy'),reportedRole:db.role,reportedEmail:db.actorEmail || null,createdBy:db.actor || db.role,createdAt,status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
+  const r={id:requestIdAt(createdAt,db.requests),title:required(v,'title'),equipmentId:v.equipmentId,description:optional(v,'description'),impact:v.impact || '',reportedBy:db.actor || required(v,'reportedBy'),reportedRole:db.role,reportedJob:db.actorJob || '',reportedEmail:db.actorEmail || null,createdBy:db.actor || db.role,createdAt,status:'Submitted',priority:null,photos:v.photos || [],risks:[],history:[]};
   audit(db,r,'Submitted'); db.requests.unshift(r); return r;
 }
 export function canRemoveIntervention(db,r) {
@@ -279,7 +279,7 @@ export function addPartRequest(db,v) {
   allow(db,'parts'); asset(db,v.equipmentId);
   if(v.workOrderId) { const w=record(db,'workOrders',v.workOrderId); requireValue(w.equipmentId===v.equipmentId,'Part and work order must refer to the same equipment.'); stage(w,'Awaiting risk assessment','Awaiting approval','Planned','In progress','Waiting for parts'); }
   const quantity=number(v.quantity,1); requireValue(Number.isInteger(quantity),'Quantity must be a whole number.');
-  const p={id:nextId(db.partRequests,'SPR'),title:required(v,'title'),reference:required(v,'reference'),equipmentId:v.equipmentId,workOrderId:v.workOrderId || null,quantity,unit:v.unit || 'pcs',description:optional(v,'description'),neededBy:required(v,'neededBy'),urgency:v.urgency || 'P3',equivalent:v.equivalent==='yes',photos:v.photos || [],status:db.role==='Maintenance Responsible'?'Purchasing':'Responsible review',createdAt:today(),requestedBy:db.actor || db.role,requestedRole:db.role,receivedQuantity:0,acceptedQuantity:0,rejectedQuantity:0,history:[],deliveries:[]};
+  const p={id:nextId(db.partRequests,'SPR'),title:required(v,'title'),reference:required(v,'reference'),equipmentId:v.equipmentId,workOrderId:v.workOrderId || null,quantity,unit:v.unit || 'pcs',description:optional(v,'description'),neededBy:required(v,'neededBy'),urgency:v.urgency || 'P3',equivalent:v.equivalent==='yes',photos:v.photos || [],status:db.role==='Maintenance Responsible'?'Purchasing':'Responsible review',createdAt:today(),requestedBy:db.actor || db.role,requestedRole:db.role,requestedJob:db.actorJob || '',receivedQuantity:0,acceptedQuantity:0,rejectedQuantity:0,history:[],deliveries:[]};
   db.partRequests.unshift(p); audit(db,p,'Purchase requested');
   if(db.role==='Maintenance Responsible') audit(db,p,'Responsible approval');
   if(p.workOrderId) { const w=record(db,'workOrders',p.workOrderId); if(['Planned','In progress'].includes(w.status)) { w.status='Waiting for parts'; audit(db,w,'Waiting for parts',p.id); } }
@@ -291,7 +291,7 @@ export function updatePart(db,id,action,v) {
     allow(db,'approve'); stage(p,'Responsible review','Order approval'); const note=optional(v,'note');
     const orderReview=p.status==='Order approval';
     p.status=orderReview?(action==='approve'?'Ordered':'Purchasing'):(action==='approve'?'Purchasing':'Rejected');
-    if(orderReview) p.orderApproval=action==='approve'?{actor:db.actor || db.role,role:db.role,at:now()}:null;
+    if(orderReview) p.orderApproval=action==='approve'?{actor:db.actor || db.role,job:db.actorJob || '',role:db.role,at:now()}:null;
     audit(db,p,orderReview?(action==='approve'?'Purchase authorized':'Order returned for revision'):p.status,note);
   } else if(action==='order') {
     allow(db,'purchase'); stage(p,'Purchasing');
@@ -341,7 +341,7 @@ export function moveStock(db,id,v) {
   const item=record(db,'inventory',id), quantity=number(v.quantity);
   requireValue(quantity>0 && ['in','out'].includes(v.type),'Enter a positive stock quantity and direction. / Saisissez une quantité positive et un sens de mouvement.');
   if(v.type==='out') { allow(db,'equipment'); requireValue(quantity<=stockBalance(item),'Insufficient stock. / Stock insuffisant.'); }
-  const movement={type:v.type,quantity,at:now(),actor:db.actor || db.role,role:db.role,note:optional(v,'note')};
+  const movement={type:v.type,quantity,at:now(),actor:db.actor || db.role,job:db.actorJob || '',role:db.role,note:optional(v,'note')};
   const before=stockBalance(item),wasLow=before<=item.minimum;
   item.movements.push(movement); audit(db,item,v.type==='in'?'Stock received':'Stock issued',movement.note);
   const after=stockBalance(item),isLow=after<=item.minimum;
@@ -406,7 +406,7 @@ export function recordReliability(db,v) {
   const logs=equipment.reliabilityLog || [];
   const same=log=>log.startDate===startDate && log.endDate===endDate;
   requireValue(!logs.some(log=>!same(log) && log.startDate<=endDate && log.endDate>=startDate),'Measurement periods cannot overlap. Edit the existing period instead. / Les périodes ne peuvent pas se chevaucher. Modifiez la période existante.');
-  const entry={startDate,endDate,operatingHours,failureCount,maintenanceCount,failedUnitHours,failedUnitCount,updatedAt:now(),actor:db.actor || db.role,role:db.role};
+  const entry={startDate,endDate,operatingHours,failureCount,maintenanceCount,failedUnitHours,failedUnitCount,updatedAt:now(),actor:db.actor || db.role,job:db.actorJob || '',role:db.role};
   equipment.reliabilityLog=[...logs.filter(log=>!same(log)),entry].sort((a,b)=>b.startDate.localeCompare(a.startDate));
   audit(db,equipment,'Reliability measurements recorded');
   return entry;
@@ -420,7 +420,7 @@ export function addReport(db,v) {
   allow(db,'report'); const date=required(v,'date');
   const equipmentId=v.equipmentId || null; if(equipmentId) asset(db,equipmentId);
   const activities=interventionReports(db).filter(item=>item.date===date && inEquipmentScope(db,item.equipmentId,equipmentId));
-  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',equipmentId,author:db.actor || db.role,authorRole:db.role,summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
+  const r={id:nextId(db.reports,'SR'),date,shift:v.shift || 'Day',equipmentId,author:db.actor || db.role,authorRole:db.role,authorJob:db.actorJob || '',summary:optional(v,'summary'),handover:optional(v,'handover'),diagnosis:optional(v,'diagnosis'),risks:optional(v,'risks'),rootCause:optional(v,'rootCause'),result:optional(v,'result'),activities,status:'Draft',history:[]};
   db.reports.unshift(r); audit(db,r,'Report created'); return r;
 }
 export function inEquipmentScope(db,equipmentId,scopeId) {
@@ -476,7 +476,7 @@ export function recordCounter(db,id,v) {
  const readings=equipment.runningCounter || [],previous=readings.at(-1);
  requireValue(!previous || date>previous.date,'Choose a date after the last reading. / Choisissez une date après le dernier relevé.');
  requireValue(!previous || hours>=previous.hours,'Counter cannot decrease. / Le compteur ne peut pas diminuer.');
- const reading={date,hours,delta:previous?Math.round((hours-previous.hours)*100)/100:null,actor:db.actor || db.role,role:db.role};
+ const reading={date,hours,delta:previous?Math.round((hours-previous.hours)*100)/100:null,actor:db.actor || db.role,job:db.actorJob || '',role:db.role};
  (equipment.runningCounter ||= []).push(reading);audit(db,equipment,'Operating counter recorded',date+' · '+hours+' h');return reading;
 }
 

@@ -42,7 +42,15 @@ function userFor(req,users) {
   if(!session || session.expires<Date.now()) { if(token) sessions.delete(token); return null; }
   return users[session.email]?.hash ? {email:session.email,...users[session.email],name:personName(users[session.email]),role:activeRole(users[session.email].role)} : null;
 }
-function view(workspace,user) { return workspaceForRole(workspace,user); }
+function view(workspace,user,users) {
+  const result=workspaceForRole(workspace,user);
+  result.actorJob=user.job || '';result.serverIdentity=true;result.personJobs={};
+  const accounts=Object.values(users || {});
+  const add=(name,role)=>{if(!name)return;const matches=accounts.filter(a=>personName(a)===name && (!role || activeRole(a.role)===role));if(matches.length===1 && matches[0].job)result.personJobs[name+'|'+(role || '')]=matches[0].job;};
+  const visit=value=>{if(!value || typeof value!=='object')return;if(Array.isArray(value)){value.forEach(visit);return;}for(const [name,role] of [[value.reportedBy,value.reportedRole],[value.requestedBy,value.requestedRole],[value.author,value.authorRole],[value.actor,value.role]])add(name,role);Object.values(value).forEach(visit);};
+  for(const key of ['requests','workOrders','reports','partRequests','inventory','preventive'])visit(result[key]);
+  add(user.name,user.role);return result;
+}
 async function workspace() {
   const existing=await read('workspace.json',null);
   if(existing) return migrate(existing);
@@ -128,7 +136,7 @@ export async function api(req,res) {
     if(!user) {send(res,401,{error:'Sign in required.'});return true;}
     if(req.method==='POST' && req.url==='/api/logout') {sessions.delete(cookie(req));send(res,200,{ok:true},{'set-cookie':'amms_access_session=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0'});return true;}
     if(req.method==='GET' && req.url==='/api/revision') {send(res,200,{revision:(await workspace()).revision || 0});return true;}
-    if(req.method==='GET' && req.url==='/api/workspace') {send(res,200,{workspace:view(await workspace(),user),user:{email:user.email,name:user.name,role:user.role}});return true;}
+    if(req.method==='GET' && req.url==='/api/workspace') {send(res,200,{workspace:view(await workspace(),user,users),user:{email:user.email,name:user.name,role:user.role}});return true;}
     if(req.method==='POST' && req.url==='/api/command') {
       const command=await body(req);
       if(!command || typeof command.type!=='string' || (command.id!=null && typeof command.id!=='string') || (command.values!=null && (typeof command.values!=='object' || Array.isArray(command.values))) || (command.key!=null && !/^[a-f0-9-]{36}$/.test(command.key))) {send(res,400,{error:'Invalid command.'});return true;}
@@ -136,15 +144,15 @@ export async function api(req,res) {
       const result=await serial(async()=>{
         const current=await workspace();
         const receipt=command.key && `${user.email}:${command.key}`;
-        if(receipt && current.appliedCommands?.includes(receipt)) return view(current,user);
-        current.role=user.role;current.actor=user.name;current.actorEmail=user.email;
+        if(receipt && current.appliedCommands?.includes(receipt)) return view(current,user,users);
+        current.role=user.role;current.actor=user.name;current.actorEmail=user.email;current.actorJob=user.job || '';
         const before=recordIds(current);
         try { applyCommand(current,command); if(command.created) assignCreated(current,before,command.created); }
         catch(e) { e.status=409; throw e; }
         if(receipt) current.appliedCommands=[...(current.appliedCommands || []).slice(-999),receipt];
         current.revision=(current.revision||0)+1;
         await save('workspace.json',current);
-        return view(current,user);
+        return view(current,user,users);
       });
       send(res,200,{workspace:result});return true;
     }

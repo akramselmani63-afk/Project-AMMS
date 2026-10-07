@@ -27,7 +27,7 @@ test('company server shares records and enforces account roles',async()=>{
   const invite='test-activation-code';
   const inviteHash=createHash('sha256').update(invite).digest('hex');
   await writeFile(join(directory,'users.json'),JSON.stringify({
-    'employee@example.test':{name:'Test Employee',role:'Employee',inviteHash},
+    'employee@example.test':{name:'Test Employee',job:'Production operator',role:'Employee',inviteHash},
     'hse@example.test':{name:'Test HSE',role:'HSE',inviteHash},
     'viewer@example.test':{name:'Test Employee',role:'Developer Admin',inviteHash}
   }));
@@ -78,6 +78,10 @@ test('company server shares records and enforces account roles',async()=>{
     assert.equal(shared.data.workspace.requests[0].id,id);
     assert.equal(shared.data.workspace.requests[0].reportedBy,'Test Employee');
     assert.equal(shared.data.workspace.requests[0].reportedRole,'Employee');
+    assert.equal(shared.data.workspace.requests[0].reportedJob,'Production operator');
+    assert.equal(shared.data.workspace.personJobs['Test Employee|Employee'],'Production operator');
+    assert.equal(shared.data.workspace.serverIdentity,true);
+    assert.doesNotMatch(JSON.stringify(shared.data.workspace.personJobs),/hash|invite|password/i);
     assert.equal(shared.data.workspace.role,'HSE');
     assert.doesNotMatch(await readFile(join(directory,'users.json'),'utf8'),/a strong test password/);
     const queued={...command,values:{...command.values,title:'Previously queued fault'},created:{...command.created,requests:[`IR-${'b'.repeat(32)}`]},key:'44444444-4444-4444-8444-444444444444'};
