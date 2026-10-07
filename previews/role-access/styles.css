@@ -279,7 +279,7 @@ header .mode-switch{white-space:nowrap;font-size:11px}
 }
 @media(max-width:780px){
   body.drawer-open{overflow:hidden}
-  .topbar{position:sticky;top:0;z-index:8}
+  .topbar{position:relative;top:auto;z-index:8}
   .menu-button{display:flex;width:42px;height:42px;flex:none}
   .sidebar{width:min(330px,88vw);height:100dvh;min-height:0;border-radius:0 18px 18px 0;transform:translate3d(-105%,0,0);transition:transform .25s cubic-bezier(.2,.8,.2,1);box-shadow:none;overflow:hidden}
   .sidebar.open{transform:translate3d(0,0,0);box-shadow:18px 0 42px #061e3d55}
