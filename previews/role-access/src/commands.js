@@ -1,7 +1,14 @@
+import {workspaceForRole} from './access.js';
 import * as flow from './workflow.js';
 
 // The same workflow rules run in the browser demo and on the company server.
-export function applyCommand(db,command) { const result=executeCommand(db,command);flow.syncEquipmentStates(db);return result; }
+export function applyCommand(db,command) {
+  if(db.role==='Purchasing Department' && !['order','receive'].includes(command.type)) throw new Error('This role can only process spare-parts purchases.');
+  if(['Production Responsible','HSE'].includes(db.role)) {
+    const visible=workspaceForRole(db,{role:db.role,name:db.actor,email:db.actorEmail});
+    if(command.values?.equipmentId && !visible.equipment.some(e=>e.id===command.values.equipmentId) || command.id && !['requests','workOrders','preventive','equipment'].some(key=>visible[key].some(r=>r.id===command.id))) throw new Error('Record outside your permitted zones.');
+  }
+  const result=executeCommand(db,command);flow.syncEquipmentStates(db);return result; }
 function executeCommand(db, command) {
   const {type, id, values = {}} = command;
   switch (type) {

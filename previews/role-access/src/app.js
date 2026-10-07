@@ -168,7 +168,7 @@ function signInView() {
 function render() {
   const sourceDb=db; db=workspaceForRole(db,{role:db.role,name:db.actor || db.role});
   try {
-  if(!canSeePage(db.role,page)) { page='Overview'; detail=null; }
+  if(!canSeePage(db.role,page)) { page=db.role==='Employee'?'Requests':db.role==='Purchasing Department'?'Parts':'Overview'; detail=null; }
   document.documentElement.lang=db.language;
   document.body.classList.toggle('drawer-open',signedIn && drawerOpen);
   if(!signedIn) { app.innerHTML=signInView(); if(!serverMode) { app.querySelector('.auth-tabs')?.remove(); app.querySelector('#account-form')?.remove(); app.querySelector('.signin-card h2').textContent=t('Open AMMS','Ouvrir AMMS'); app.querySelector('.signin-card > p').textContent=t('Local access keeps records on this device and does not verify identity.','L’accès local conserve les données sur cet appareil et ne vérifie pas l’identité.'); const local=app.querySelector('.demo-access'); local.open=true; local.querySelector('summary')?.remove(); } if(serverMode) { app.querySelector('.demo-access')?.remove(); app.querySelector('.signin-card > p').textContent=navigator.onLine?t('Use your provisioned company account. Sign-in requires a connection.','Utilisez votre compte autorisé par l’entreprise. La connexion nécessite Internet.'):t('The connection is lost. Connect to sign in.','La connexion est perdue. Connectez-vous pour vous identifier.'); app.querySelector('.signin-footer span').textContent=t('Company server','Serveur de l’entreprise'); if(authMode==='signup') { app.querySelector('[name="name"]')?.closest('label')?.remove(); app.querySelector('[name="password"]').minLength=12; app.querySelector('[name="confirm"]').minLength=12; app.querySelector('#auth-message').insertAdjacentHTML('beforebegin',`<label class="field"><span>${t('Activation code from IT','Code d’activation fourni par IT')}</span><input name="invite" autocomplete="one-time-code" required></label>`); } } return; }
@@ -181,7 +181,7 @@ function render() {
   } finally { db=sourceDb; }
 }
 function kpiView() {
-  if(['Employee','Production Responsible','HSE','Purchasing Department'].includes(db.role)) return restrictedKpis();
+  if(['Employee','Purchasing Department'].includes(db.role)) return restrictedKpis();
   const stats=maintenanceStats(db,{days:kpiDays,equipmentId:kpiEquipment});
   const value=(number,unit='')=>number===null?'—':`${number.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:1})}${unit}`;
   const noData=t('Not enough data','Données insuffisantes');
@@ -211,7 +211,7 @@ function reliabilityForm(id) {
   return `<p class="modal-context">${t('Use verified meter / SCADA operating hours and event counts for the same machine and period. Calendar hours are not operating hours. Saving the exact same period updates it; overlapping periods are refused.','Utilisez des heures de fonctionnement vérifiées (compteur / SCADA) et les nombres d’événements pour la même machine et période. Les heures calendaires ne sont pas les heures de fonctionnement. Une période identique est modifiée ; les chevauchements sont refusés.')}</p>${select('equipmentId',t('Machine / component','Machine / composant'),machines.map(e=>[e.id,path(e.id)]),equipmentId || kpiEquipment)}${field('startDate',t('Period start','Début de période'),'date',startDate || stats.from || flow.today())}${field('endDate',t('Period end','Fin de période'),'date',endDate || flow.today())}${hours('operatingHours',t('Actual operating hours','Heures réelles de fonctionnement'),entry?.operatingHours ?? '').replace('<input ','<input required ')}${field('failureCount',t('Failures in this period','Pannes dans cette période'),'number',entry?.failureCount ?? 0)}${field('maintenanceCount',t('All maintenance events (corrective + preventive)','Toutes les maintenances (correctives + préventives)'),'number',entry?.maintenanceCount ?? 0)}<details class="field full" ${entry?.failedUnitCount?'open':''}><summary>${t('MTTF: nonrepairable unit lifetimes (optional)','MTTF : durées de vie des unités non réparables (facultatif)')}</summary><p>${t('Enter the sum of full operating lifetimes of failed, replaced units such as lamps. This is an observed average; surviving units are not included. Do not enter repairable-machine uptime here.','Saisissez la somme des durées de vie complètes d’unités défaillantes remplacées, comme des lampes. C’est une moyenne observée ; les unités encore en service ne sont pas incluses. Ne saisissez pas ici le fonctionnement des machines réparables.')}</p><div class="form-grid">${hours('failedUnitHours',t('Total full lifetimes of failed units (hours)','Durées de vie totales des unités défaillantes (heures)'),entry?.failedUnitHours ?? '')}${field('failedUnitCount',t('Number of failed units','Nombre d’unités défaillantes'),'number',entry?.failedUnitCount ?? '',false)}</div></details>`;
 }
 function restrictedKpis(standalone=true) {
-  const stats=db.publicKpis?.[kpiDays] || {};
+  const stats=maintenanceStats(db,{days:kpiDays});
   let values;
   if(db.role==='Purchasing Department') values=[
     [t('Orders awaiting authorization','Commandes en attente d’autorisation'),db.partRequests.filter(p=>p.status==='Order approval').length],
@@ -219,10 +219,12 @@ function restrictedKpis(standalone=true) {
     [t('Late deliveries','Livraisons en retard'),db.partRequests.filter(p=>['Ordered','Partial acceptance'].includes(p.status) && p.expectedDate<flow.today()).length],
     [t('Technically accepted','Réceptionnées techniquement'),db.partRequests.filter(p=>['Accepted','Closed'].includes(p.status)).length]
   ];
-  else if(db.role==='HSE') values=[
-    [t('Safety reviews pending','Validations HSE en attente'),db.requests.filter(r=>flow.canReviewRequest('HSE',r,db)).length],
+  else if(['HSE','Production Responsible'].includes(db.role)) values=[
+    [t('Safety reviews pending','Validations HSE en attente'),db.requests.filter(r=>flow.canReviewRequest(db.role,r,db)).length],
     [t('Approved safety assessments','Évaluations HSE approuvées'),db.requests.filter(r=>r.hseApproval).length],
-    [t('Completed interventions','Interventions terminées'),stats.completedCount ?? 0]
+    [t('Completed interventions','Interventions terminées'),stats.completedCount ?? 0],
+    [t('Recorded downtime','Arrêt enregistré'),`${stats.downtimeHours} h`],
+    [t('Overdue preventive plans','Plans préventifs en retard'),stats.overduePM]
   ];
   else values=[
     [t('Completion rate','Taux de clôture'),stats.completionRate==null?'—':`${stats.completionRate.toFixed(1)}%`],
@@ -243,8 +245,8 @@ function restrictedOverview() {
   const employee=db.role==='Employee',production=db.role==='Production Responsible',hse=db.role==='HSE';
   const title=employee?t('My intervention history','Mon historique d’interventions'):production?t('Production interventions','Interventions production'):hse?t('HSE overview','Suivi HSE'):t('Purchasing overview','Suivi achats');
   const collection=employee || production || hse?'requests':'partRequests';
-  const items=employee || production?db.requests:hse?db.requests.filter(r=>!flow.canReviewRequest('HSE',r,db) && (r.history || []).some(h=>h.role==='HSE' && ['HSE approval','Returned','Rejected'].includes(h.action))):db.partRequests.filter(p=>!['Accepted','Closed','Rejected'].includes(p.status));
-  return heading(title,t('Actions and indicators relevant to your role.','Actions et indicateurs liés à votre rôle.'),employee || production?button(t('New intervention request','Nouvelle demande d’intervention'),'new-request','',true,true):'')+(employee || production?'':restrictedKpis(false))+`<div class="role-overview-layout ${hse || production?'with-approvals':''}">${hse || production?responsibleQueue():''}<section class="panel role-records-panel"><div class="panel-head"><h2>${employee?t('My intervention requests','Mes demandes d’intervention'):production?t('Requests and safety reviews','Demandes et validations de sécurité'):hse?t('Review history','Historique des validations'):t('Purchasing actions','Actions achats')}</h2></div>${overviewRecords(items,collection)}</section></div>`;
+  const items=employee || production || hse?db.requests:db.partRequests.filter(p=>!['Accepted','Closed','Rejected'].includes(p.status));
+  return heading(title,t('Actions and indicators relevant to your role.','Actions et indicateurs liés à votre rôle.'),employee || production?button(t('New intervention request','Nouvelle demande d’intervention'),'new-request','',true,true):'')+(employee?'':restrictedKpis(false))+`<div class="role-overview-layout ${hse || production?'with-approvals':''}">${hse || production?responsibleQueue():''}<section class="panel role-records-panel"><div class="panel-head"><h2>${employee?t('My intervention requests','Mes demandes d’intervention'):production?t('Requests and safety reviews','Demandes et validations de sécurité'):hse?t('Interventions · MCR and utilities','Interventions · MCR et utilités'):t('Purchasing actions','Actions achats')}</h2></div>${overviewRecords(items,collection)}</section></div>`;
 }
 function view() {
   if(page==='KPI') return kpiView();

@@ -280,10 +280,10 @@ test('equipment edits preserve links and reject a cyclic hierarchy',()=>{
 });
 test('inventory persists audited movements, permissions and nonnegative balances',async()=>{
   const {applyCommand,recordIds,newRecordIds,assignCreated}=await import('./commands.js');
-  const db=f.seed(); db.role='Purchasing Department'; const before=recordIds(db);
+  const db=f.seed(); db.role='Purchasing Department'; assert.throws(()=>applyCommand(db,{type:'new-stock'}),/spare-parts/); db.role='Maintenance Engineer'; const before=recordIds(db);
   const item=applyCommand(db,{type:'new-stock',values:{name:'Bearing',reference:'6204',unit:'pcs',minimum:2}});
   const ids=newRecordIds(db,before); assignCreated(db,before,ids); assert.match(item.id,/^STK-[a-f0-9]{32}$/);
-  f.moveStock(db,item.id,{type:'in',quantity:5,note:'BL-01'});
+  db.role='Purchasing Department'; f.moveStock(db,item.id,{type:'in',quantity:5,note:'BL-01'});
   assert.throws(()=>f.moveStock(db,item.id,{type:'out',quantity:1}),/role/);
   db.role='Maintenance Engineer'; f.moveStock(db,item.id,{type:'out',quantity:2});
   assert.equal(f.stockBalance(item),3); assert.equal(item.movements.length,2);

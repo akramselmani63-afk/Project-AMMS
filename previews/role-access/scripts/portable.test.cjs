@@ -131,11 +131,11 @@ test('access preview hides restricted routes, direct records and private KPI fie
   const workspace=seed({examples:true});workspace.role=role;workspace.actor='Alice';workspace.requests[0].reportedBy='Alice';
   const app={innerHTML:'',removeAttribute(){}};const listeners={};const saved=JSON.stringify(workspace);
   const context=vm.createContext({document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},sessionStorage:{getItem:()=> '1'},localStorage:{getItem:()=>saved},indexedDB:{open(){throw Error('Unavailable')}},console:{warn(){}},structuredClone});
-  vm.runInContext(script,context);await new Promise(r=>setImmediate(r));assert.doesNotMatch(app.innerHTML,/ACCESS PREVIEW|APERÇU DES ACCÈS/);assert.match(app.innerHTML,/overview-screen/);
+  vm.runInContext(script,context);await new Promise(r=>setImmediate(r));assert.doesNotMatch(app.innerHTML,/ACCESS PREVIEW|APERÇU DES ACCÈS/);if(!['Employee','Purchasing Department'].includes(role))assert.match(app.innerHTML,/overview-screen/);
   const click=(page)=>listeners.click({target:{closest:s=>s==='[data-page]'?{dataset:{page}}:null}});
-  await click('KPI');if(!['Employee','Production Responsible'].includes(role)) assert.match(app.innerHTML,/KPI/);
-  if(role==='Employee'){assert.doesNotMatch(app.innerHTML,/data-page="Parts"|MTTR/);await click('Parts');assert.doesNotMatch(app.innerHTML,/data-page="Parts"/);await listeners.click({target:{closest:s=>s==='[data-action]'?{dataset:{action:'open',id:'partRequests:PRIVATE'}}:null}});assert.match(app.innerHTML,/Mon historique d’interventions|My intervention history/);}
-  if(role==='HSE') assert.doesNotMatch(app.innerHTML,/MTTR|Recorded downtime/);
-  if(role==='Purchasing Department') assert.match(app.innerHTML,/Livraisons en retard|Late deliveries/);
+  await click('KPI');if(!['Employee','Purchasing Department'].includes(role)) assert.match(app.innerHTML,/KPI/);
+  if(role==='Employee'){assert.doesNotMatch(app.innerHTML,/data-page="Parts"|MTTR/);await click('Parts');assert.doesNotMatch(app.innerHTML,/data-page="Parts"/);await listeners.click({target:{closest:s=>s==='[data-action]'?{dataset:{action:'open',id:'partRequests:PRIVATE'}}:null}});assert.match(app.innerHTML,/Interventions|interventions/);}
+  if(['HSE','Production Responsible'].includes(role)) assert.match(app.innerHTML,/MTTR/);
+  if(role==='Purchasing Department') assert.doesNotMatch(app.innerHTML,/data-page="KPI"|data-page="Inventory"/);
  }
 });

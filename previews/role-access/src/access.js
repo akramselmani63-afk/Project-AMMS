@@ -1,13 +1,11 @@
-import {safetyReviewer,canReviewRequest} from './workflow.js';
-import {maintenanceStats} from './statistics.js';
 
 export const rolePages={
-  Employee:['Overview','Requests','Notifications','Profile'],
-  'Production Responsible':['Overview','Requests','Notifications','Profile'],
+  Employee:['Equipment','Requests','Notifications','Profile'],
+  'Production Responsible':['Overview','KPI','Equipment','Requests','Preventive','Notifications','Profile'],
   'Maintenance Engineer':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
   'Maintenance Responsible':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
-  HSE:['Overview','KPI','Equipment','Requests','Notifications','Profile'],
-  'Purchasing Department':['Overview','KPI','Equipment','Parts','Inventory','Notifications','Profile'],
+  HSE:['Overview','KPI','Equipment','Requests','Preventive','Notifications','Profile'],
+  'Purchasing Department':['Parts','Notifications','Profile'],
   Viewer:['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile']
 };
 export const canSeePage=(role,page)=>(rolePages[role] || []).includes(page);
@@ -20,12 +18,7 @@ export function workspaceForRole(workspace,user) {
   const {appliedCommands,...result}=workspace;
   result.role=user.role;result.actor=user.name;result.actorEmail=user.email;result.accessProjection=true;
   if(['Maintenance Engineer','Maintenance Responsible','Viewer'].includes(user.role)) return result;
-  result.publicKpis=Object.fromEntries([7,30,90,0].map(days=>{
-    const stats=maintenanceStats(workspace,{days});
-    const safe=pick(stats,user.role==='HSE'?['from','today','completedCount']:['from','today','completionRate','completedCount','downtimeHours','overduePM']);
-    if(user.role==='Employee') safe.preventiveCompleted=workspace.workOrders.filter(w=>w.status==='Closed' && (w.type==='Preventive' || w.pmId) && w.completedAt && (!stats.from || w.completedAt.slice(0,10)>=stats.from) && w.completedAt.slice(0,10)<=stats.today).length;
-    return [days,safe];
-  }));
+  result.publicKpis={};
   result.equipment=workspace.equipment.map(e=>pick(e,equipmentFields));
   result.documents=[];result.parts=[];result.reports=[];
   if(user.role==='Employee') {
@@ -34,19 +27,18 @@ export function workspaceForRole(workspace,user) {
     result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId)).map(w=>({...pick(w,workFields),participants:[],history:[]}));
     result.preventive=[];result.publicKpis={};
     result.partRequests=[];result.inventory=[];
-  } else if(user.role==='Production Responsible') {
-    result.requests=workspace.requests.filter(r=>(user.email?r.reportedEmail===user.email:r.reportedBy===user.name) || r.reportedRole==='Employee' || canReviewRequest(user.role,r,workspace) || r.hseApproval?.role==='Production Responsible');
+  } else if(['Production Responsible','HSE'].includes(user.role)) {
+    const roots=new Set(workspace.equipment.filter(e=>!e.parentId && (user.role==='Production Responsible'?/^(Production|Conditionnement)$/i.test(e.name):/MCR|Utilités|Utilities/i.test(e.name))).map(e=>e.id));
+    const inScope=id=>{const seen=new Set();while(id && !seen.has(id)){if(roots.has(id))return true;seen.add(id);id=workspace.equipment.find(e=>e.id===id)?.parentId;}return false;};
+    result.equipment=result.equipment.filter(e=>inScope(e.id));
+    result.requests=workspace.requests.filter(r=>inScope(r.equipmentId));
     const ids=new Set(result.requests.map(r=>r.id));
-    result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId));
-    result.partRequests=[];result.inventory=[];result.preventive=[];result.publicKpis={};
-  } else if(user.role==='HSE') {
-    result.requests=workspace.requests.filter(r=>safetyReviewer(workspace,r)==='HSE');
-    const ids=new Set(result.requests.map(r=>r.id));
-    result.workOrders=workspace.workOrders.filter(w=>ids.has(w.requestId));
-    result.partRequests=[];result.inventory=[];result.preventive=[];
+    result.workOrders=workspace.workOrders.filter(w=>inScope(w.equipmentId) && (!w.requestId || ids.has(w.requestId)));
+    result.preventive=workspace.preventive.filter(p=>inScope(p.equipmentId));
+    result.partRequests=[];result.inventory=[];
   } else if(user.role==='Purchasing Department') {
     result.requests=[];result.workOrders=[];result.preventive=[];
-    result.publicKpis={};
+    result.inventory=[];
   } else {
     result.requests=[];result.workOrders=[];result.preventive=[];result.partRequests=[];result.inventory=[];result.publicKpis={};
   }
