@@ -611,4 +611,4 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .overview-stats .stat:first-child,.kpi-reliability>div:first-child { border-color:#305c82; }
 
 /* Keep card outlines consistent despite individual section border overrides. */
-.panel,.stat,.pm-card,.document-card,.report,.intervention-report-card,.signin-card,.choice-card,.kpi-reliability>div,.kpi-workload>div,.kpi-downtime,.kpi-total-downtime,.kpi-measurements,.equipment-register .equipment-node { border:1px solid #000 !important; }
+.panel,.stat,.pm-card,.document-card,.report,.intervention-report-card,.signin-card,.choice-card,.kpi-reliability>div,.kpi-workload>div,.kpi-downtime,.kpi-total-downtime,.kpi-measurements,.equipment-register .equipment-node { border:1px solid #000 !important; box-shadow:0 6px 18px rgba(23,52,81,.12) !important; }
