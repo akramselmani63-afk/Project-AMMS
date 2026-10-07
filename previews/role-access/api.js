@@ -130,13 +130,13 @@ export async function api(req,res) {
       }
       failed.delete(address);
       const token=randomBytes(32).toString('hex');sessions.set(token,{email:address,expires:Date.now()+8*60*60_000});
-      send(res,200,{user:{name:personName(account),role:activeRole(account.role),email:address}},{'set-cookie':`amms_access_session=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=28800${secureCookie}`});return true;
+      send(res,200,{user:{name:personName(account),job:account.job || '',role:activeRole(account.role),email:address}},{'set-cookie':`amms_access_session=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=28800${secureCookie}`});return true;
     }
     const user=userFor(req,users);
     if(!user) {send(res,401,{error:'Sign in required.'});return true;}
     if(req.method==='POST' && req.url==='/api/logout') {sessions.delete(cookie(req));send(res,200,{ok:true},{'set-cookie':'amms_access_session=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0'});return true;}
     if(req.method==='GET' && req.url==='/api/revision') {send(res,200,{revision:(await workspace()).revision || 0});return true;}
-    if(req.method==='GET' && req.url==='/api/workspace') {send(res,200,{workspace:view(await workspace(),user,users),user:{email:user.email,name:user.name,role:user.role}});return true;}
+    if(req.method==='GET' && req.url==='/api/workspace') {send(res,200,{workspace:view(await workspace(),user,users),user:{email:user.email,name:user.name,job:user.job || '',role:user.role}});return true;}
     if(req.method==='POST' && req.url==='/api/command') {
       const command=await body(req);
       if(!command || typeof command.type!=='string' || (command.id!=null && typeof command.id!=='string') || (command.values!=null && (typeof command.values!=='object' || Array.isArray(command.values))) || (command.key!=null && !/^[a-f0-9-]{36}$/.test(command.key))) {send(res,400,{error:'Invalid command.'});return true;}

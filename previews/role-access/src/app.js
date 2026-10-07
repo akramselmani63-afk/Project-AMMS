@@ -36,7 +36,7 @@ async function refreshServer() {
   const cache=await readServerCache();
   if(cache?.queue?.length && cache.email!==result.user.email) throw new Error(t('Another account has unsent changes on this device. Sign in with that account first.','Un autre compte a des modifications non envoyées sur cet appareil. Connectez-vous d’abord avec ce compte.'));
   serverEmail=result.user.email; pendingCommands=cache?.email===serverEmail?cache.queue || []:[];
-  db=pendingCommands.length?cache.workspace:result.workspace; db.language=language; signedIn=true;
+  db=pendingCommands.length?cache.workspace:result.workspace; db.language=language; db.serverIdentity=true; db.actorJob=result.user.job || db.actorJob || ''; signedIn=true;
   if(!pendingCommands.length) await writeServerCache({email:serverEmail,workspace:db,queue:[]});
   else await flushPending();
 }
@@ -140,7 +140,7 @@ const nameInitials=name=>{ const parts=String(name || '').trim().split(/\s+/).fi
 const avatarText=role=>role===db.role && db.actor?.trim()?nameInitials(db.actor):role==='Maintenance Engineer'?t('ME','IM'):role==='Maintenance Responsible'?t('MR','RM'):role==='Purchasing Department'?t('PD','SA'):role==='Production Responsible'?t('PR','RP'):role==='Viewer'?t('VW','LE'):role==='Employee'?t('EM','EM'):'HSE';
 const facepile=(roles,interactive=true)=>`<span class="facepile" role="group" aria-label="${t('Assigned maintenance roles','Rôles maintenance affectés')}">${[...new Set(roles || [])].map(role=>interactive?`<button type="button" class="facepile-avatar ${role==='Maintenance Responsible'?'responsible':''}" data-action="profile-role" data-id="${esc(role)}" aria-label="${t('View profile: ','Voir le profil : ')}${esc(label(role))}" title="${esc(label(role))}">${avatarText(role)}</button>`:`<span class="facepile-avatar ${role==='Maintenance Responsible'?'responsible':''}" title="${esc(label(role))}">${avatarText(role)}</span>`).join('')}</span>`;
 const person=(name,role,job)=>{
-  if(db.serverIdentity) { const title=job || db.personJobs?.[name+'|'+(role || '')] || (name===db.actor?db.actorJob:'');return name?name+(title?' · '+title:''):'—'; }
+  if(serverMode || db.serverIdentity) { const title=job || db.personJobs?.[name+'|'+(role || '')] || (name===db.actor?db.actorJob:'');return name?name+(title?' · '+title:''):'—'; }
   return role&&name!==role?`${name} · ${label(role)}`:label(name || role || '—');
 };
 const empty=()=>`<div class="empty">${t('No records in this view.','Aucun enregistrement dans cette vue.')}</div>`;
