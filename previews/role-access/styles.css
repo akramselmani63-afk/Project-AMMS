@@ -683,3 +683,5 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 
 /* Keep handwritten sign-off together at the foot of both printed forms. */
 .intervention-form{display:flex;flex-direction:column;min-height:270mm}.sheet-signature-footer{margin-top:auto;padding-top:12px;break-inside:avoid;page-break-inside:avoid}.sheet-signature-footer .intervention-signatures>div{min-height:90px;border:1px solid #17364e;border-top:2px solid var(--form-blue)}@media print{#print-area .sheet-signature-footer .intervention-signatures{grid-template-columns:repeat(3,minmax(0,1fr))}#print-area .sheet-signature-footer .intervention-signatures>div{min-height:24mm;padding:7px}#print-area .intervention-form{min-height:270mm}.sheet-signature-footer{padding-top:8px}}
+
+.requirement-table{border:1px solid #17364e}.requirement-table th,.requirement-table td,.requirement-table tr:last-child td{border:1px solid #17364e}
