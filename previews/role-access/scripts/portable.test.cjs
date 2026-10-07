@@ -90,7 +90,7 @@ test('portable file opens records from every list', async () => {
   assert.match(app.innerHTML, /data-record-filter="origin"/, 'interventions filter by source');
   await open('Parts', 'open', 'partRequests');
   await click('data-action','print');
-  assert.match(printArea.innerHTML,/STATEMENT OF REQUIREMENTS|ÉTAT DES BESOINS/);
+  assert.match(printArea.innerHTML,/STATEMENT OF REQUIREMENTS|EXPRESSION DE BESOIN/);
   assert.match(printArea.innerHTML,/REF-1/);
   assert.doesNotMatch(printArea.innerHTML,/record-panel|wizard-panel/);
   await click('data-action','close-print');
@@ -99,7 +99,7 @@ test('portable file opens records from every list', async () => {
   await listeners.change({target:{dataset:{partSelect:'SP-TEST'},checked:true}});
   await listeners.change({target:{dataset:{partSelect:workspace.partRequests.find(r=>r.id!=='SP-TEST').id},checked:true}});
   await click('data-action','print-parts');
-  assert.match(printArea.innerHTML,/GROUPED STATEMENT OF REQUIREMENTS|ÉTAT DES BESOINS GROUPÉ/);
+  assert.match(printArea.innerHTML,/GROUPED STATEMENT OF REQUIREMENTS|EXPRESSION DE BESOIN GROUPÉE/);
 
   await click('data-page', 'Parts');
   assert.match(app.innerHTML, /data-record-filter="priority"/, 'parts filter by priority');
