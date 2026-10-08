@@ -60,6 +60,9 @@ test('portable file opens records from every list', async () => {
     await listeners.keydown({key,target:{closest:()=>({dataset:{gridRow:'2',gridCol:'4'}})},preventDefault(){prevented=true;}});
     assert.ok(prevented);assert.equal(selected,`[data-energy-cell][data-grid-row="${row}"][data-grid-col="${col}"]`);
   }
+  await click('data-action','energy-today');
+  const todayColumn=Number(new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}).slice(-2))-1;
+  assert.equal(selected,`[data-energy-cell][data-grid-row="0"][data-grid-col="${todayColumn}"]`);
   document.querySelector=originalQuery;
   document.querySelectorAll=()=>[];
   const date=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}).slice(0,7)+'-02';

@@ -332,7 +332,7 @@ function energyView() {
  const amount=n=>n.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:2});
  const energy=records.filter(r=>r.kind==='energy').sort((a,b)=>b.date.localeCompare(a.date));
  const totals=[['electricity',t('Electricity','Électricité'),'kWh'],['water',t('Water','Eau'),'m³'],['diesel',t('Diesel','Gasoil'),'L']];
- const toolbar=`<div class="energy-toolbar"><label class="field"><span>${t('Month','Mois')}</span><input type="month" data-energy-filter="month" value="${esc(energyMonth)}"></label>${button(t('Save table','Enregistrer le tableau'),'save-energy-table','',writable,true)}<span id="energy-save-status" role="status">${energyDrafts.size?t('Unsaved cells: ','Cases non enregistrées : ')+energyDrafts.size:''}</span>${button(energyTab==='energy'?t('Record meter readings','Saisir les index'):t('Record utility checks','Saisir les contrôles utilités'),energyTab==='energy'?'energy-form':'utility-form','',writable,true)}</div>`;
+ const toolbar=`<div class="energy-toolbar"><label class="field"><span>${t('Month','Mois')}</span><input type="month" data-energy-filter="month" value="${esc(energyMonth)}"></label>${button(t('Save table','Enregistrer le tableau'),'save-energy-table','',writable,true)}<span id="energy-save-status" role="status">${energyDrafts.size?t('Unsaved cells: ','Cases non enregistrées : ')+energyDrafts.size:''}</span>${button(energyTab==='energy'?t('Record meter readings','Saisir les index'):t('Record utility checks','Saisir les contrôles utilités'),'energy-today','',writable,true)}</div>`;
  const tabs=`<div class="energy-toggle-group" role="group" aria-label="${t('Energy sections','Rubriques énergie')}">${[['energy',t('Energy balance','Bilan énergétique')],['utility',t('Utility parameters','Paramètres utilités')]].map(([key,title])=>`<button type="button" data-energy-tab="${key}" aria-pressed="${energyTab===key}" class="${energyTab===key?'active':''}">${title}</button>`).join('')}</div>`;
  let content;
  if(energyTab==='energy') {
@@ -606,6 +606,11 @@ document.addEventListener('click',async e=>{
   if(action==='expand-equipment' || action==='collapse-equipment') { document.querySelectorAll('.equipment-node').forEach(node=>node.open=action==='expand-equipment'); return; }
   if(action==='clear-parts') { selectedParts.clear(); render(); return; }
   if(action==='print-parts') { const visible=workspaceForRole(db,{role:db.role,name:db.actor || db.role}); showPartsPrint(visible.partRequests.filter(p=>selectedParts.has(p.id))); return; }
+  if(action==='energy-today'){
+    const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'});energyMonth=today.slice(0,7);render();
+    const cell=document.querySelector(`[data-energy-cell][data-grid-row="0"][data-grid-col="${Number(today.slice(-2))-1}"]`);
+    if(cell){const section=cell.closest?.('details');if(section)section.open=true;cell.focus();cell.select?.();cell.scrollIntoView?.({block:'nearest',inline:'center',behavior:'smooth'});}return;
+  }
   if(action==='save-energy-table'){await saveEnergyTable();return;}
   if(action==='print') { printRecord(); return; }
   if(action==='print-now') { window.print(); return; }
