@@ -12,3 +12,11 @@ test('energy and utility readings preserve zero, validate limits, update with hi
  for(const role of ['Employee','Production Responsible','HSE','Purchasing Department','Viewer']){db.role=role;assert.throws(()=>saveEnergyRecord(db,{kind:'energy',date:'2026-10-08',electricity:1}),/role/);}
  assert.equal(canSeePage('Viewer','Energy'),true);assert.equal(canSeePage('Employee','Energy'),false);
 });
+
+test('supplied generator and electrical register stores cumulative indexes without summing or overwriting legacy readings',()=>{
+ const db=seed();db.role='Maintenance Engineer';saveEnergyRecord(db,{kind:'energy',date:'2026-10-08',electricity:12});
+ const r=saveEnergyRecord(db,{kind:'meter',date:'2026-10-08',generatorHours:401.4,generatorStarts:605,generatorEmergencyStops:0,generatorActive:10160,screen1active:9745.68,meterTotal:954498,meterPreviousTotal:953408,generatorMaintenance:9608});
+ assert.equal(r.values.generatorEmergencyStops,0);assert.equal(r.values.meterTotal,954498);assert.equal(db.energyRecords[0].values.electricity,12);
+ saveEnergyRecord(db,{kind:'meter',date:'2026-10-09',generatorMaintenance:9606,generatorActive:10293});assert.equal(db.energyRecords.length,3);
+ assert.throws(()=>saveEnergyRecord(db,{kind:'meter',date:'2026-10-08',generatorStarts:1.5}),/whole numbers/);
+});

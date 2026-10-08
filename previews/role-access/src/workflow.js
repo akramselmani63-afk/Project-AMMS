@@ -499,16 +499,293 @@ export const utilityParameters=[
  {key:'upsAlarm',installation:['440 kVA generator','Groupe électrogène 440 kVA'],zone:['UPS1','UPS1'],title:['Alarm (0: none / 1: alarm)','Alarme (0 : aucune / 1 : alarme)'],type:'alarm'},
  {key:'dieselLevel',installation:['440 kVA generator','Groupe électrogène 440 kVA'],zone:['UPS1','UPS1'],title:['Diesel level','Niveau gasoil'],unit:'%',min:40,max:90}
 ];
+export const energyParameters=[
+ {
+  "key": "generatorHours",
+  "group": "generator",
+  "title": [
+   "Operating hours",
+   "Heures de marche"
+  ],
+  "unit": "h",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "generatorStarts",
+  "group": "generator",
+  "title": [
+   "Starts",
+   "Nombre de démarrages"
+  ],
+  "unit": "",
+  "code": "",
+  "integer": true
+ },
+ {
+  "key": "generatorEmergencyStops",
+  "group": "generator",
+  "title": [
+   "Emergency stops",
+   "Nombre d’arrêts d’urgence"
+  ],
+  "unit": "",
+  "code": "",
+  "integer": true
+ },
+ {
+  "key": "generatorAlarmStops",
+  "group": "generator",
+  "title": [
+   "Alarms + stops",
+   "Alarmes + arrêts"
+  ],
+  "unit": "",
+  "code": "",
+  "integer": true
+ },
+ {
+  "key": "generatorActive",
+  "group": "generator",
+  "title": [
+   "Active energy",
+   "Énergie active"
+  ],
+  "unit": "kWh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "generatorReactive",
+  "group": "generator",
+  "title": [
+   "Reactive energy",
+   "Énergie réactive"
+  ],
+  "unit": "kvarh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "generatorMaintenance",
+  "group": "generator",
+  "title": [
+   "Maintenance counter",
+   "Compteur maintenance"
+  ],
+  "unit": "",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen1active",
+  "group": "screen1",
+  "title": [
+   "Active energy",
+   "Énergie active"
+  ],
+  "unit": "kWh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen1reactive",
+  "group": "screen1",
+  "title": [
+   "Reactive energy",
+   "Énergie réactive"
+  ],
+  "unit": "kvarh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen1apparent",
+  "group": "screen1",
+  "title": [
+   "Apparent energy",
+   "Énergie apparente"
+  ],
+  "unit": "kVAh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen1hours",
+  "group": "screen1",
+  "title": [
+   "Operating hours",
+   "Heures de fonctionnement"
+  ],
+  "unit": "h",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen2active",
+  "group": "screen2",
+  "title": [
+   "Active energy",
+   "Énergie active"
+  ],
+  "unit": "kWh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen2reactive",
+  "group": "screen2",
+  "title": [
+   "Reactive energy",
+   "Énergie réactive"
+  ],
+  "unit": "kvarh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen2apparent",
+  "group": "screen2",
+  "title": [
+   "Apparent energy",
+   "Énergie apparente"
+  ],
+  "unit": "kVAh",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "screen2hours",
+  "group": "screen2",
+  "title": [
+   "Operating hours",
+   "Heures de fonctionnement"
+  ],
+  "unit": "h",
+  "code": "",
+  "integer": false
+ },
+ {
+  "key": "meterTotal",
+  "group": "agridiam",
+  "title": [
+   "Total consumption index",
+   "Index de consommation totale"
+  ],
+  "unit": "kWh",
+  "code": "8.0",
+  "integer": false
+ },
+ {
+  "key": "meterPreviousTotal",
+  "group": "agridiam",
+  "title": [
+   "Previous month total index",
+   "Index total du mois précédent"
+  ],
+  "unit": "kWh",
+  "code": "8.0.46",
+  "integer": false
+ },
+ {
+  "key": "meterNight",
+  "group": "agridiam",
+  "title": [
+   "Night consumption index",
+   "Index de consommation nuit"
+  ],
+  "unit": "kWh",
+  "code": "8.1",
+  "integer": false
+ },
+ {
+  "key": "meterPreviousNight",
+  "group": "agridiam",
+  "title": [
+   "Previous month night index",
+   "Index nuit du mois précédent"
+  ],
+  "unit": "kWh",
+  "code": "8.1.46",
+  "integer": false
+ },
+ {
+  "key": "meterPeak",
+  "group": "agridiam",
+  "title": [
+   "Peak consumption index",
+   "Index de consommation pointe"
+  ],
+  "unit": "kWh",
+  "code": "8.2",
+  "integer": false
+ },
+ {
+  "key": "meterPreviousPeak",
+  "group": "agridiam",
+  "title": [
+   "Previous month peak index",
+   "Index pointe du mois précédent"
+  ],
+  "unit": "kWh",
+  "code": "8.2.46",
+  "integer": false
+ },
+ {
+  "key": "meterDay",
+  "group": "agridiam",
+  "title": [
+   "Day consumption index",
+   "Index de consommation jour"
+  ],
+  "unit": "kWh",
+  "code": "8.3",
+  "integer": false
+ },
+ {
+  "key": "meterPreviousDay",
+  "group": "agridiam",
+  "title": [
+   "Previous month day index",
+   "Index jour du mois précédent"
+  ],
+  "unit": "kWh",
+  "code": "8.3.46",
+  "integer": false
+ },
+ {
+  "key": "meterReactive",
+  "group": "agridiam",
+  "title": [
+   "Reactive energy index",
+   "Index d’énergie réactive"
+  ],
+  "unit": "kvarh",
+  "code": "8.0",
+  "integer": false
+ },
+ {
+  "key": "meterPreviousReactive",
+  "group": "agridiam",
+  "title": [
+   "Previous month reactive index",
+   "Index réactif du mois précédent"
+  ],
+  "unit": "kvarh",
+  "code": "8.0.46",
+  "integer": false
+ }
+];
 export function saveEnergyRecord(db,v) {
  requireValue(maintenance.includes(db.role),'This role cannot record energy or utility readings.');
  const date=required(v,'date');requireValue(/^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date)) && new Date(date).toISOString().slice(0,10)===date,'Enter a valid reading date.');
- const kind=v.kind;requireValue(['energy','utility'].includes(kind),'Invalid reading type.');
+ const kind=v.kind;requireValue(['energy','utility','meter'].includes(kind),'Invalid reading type.');
  const shift=kind==='utility'?v.shift:'Day';requireValue(['Day','Night'].includes(shift),'Invalid shift.');
  const values={};
- for(const spec of kind==='utility'?utilityParameters:[{key:'electricity'},{key:'water'},{key:'diesel'}]) {
+ for(const spec of kind==='utility'?utilityParameters:kind==='meter'?energyParameters:[{key:'electricity'},{key:'water'},{key:'diesel'}]) {
    if(v[spec.key]==null || String(v[spec.key]).trim()==='')continue;
    if(spec.type==='state'){requireValue(['Running','Stopped'].includes(v[spec.key]),'Invalid operating state.');values[spec.key]=v[spec.key];}
-   else {const n=number(v[spec.key]);requireValue(spec.unit!=='%' || n<=100,'Percentage must be between 0 and 100.');requireValue(spec.type!=='alarm' || [0,1].includes(n),'Alarm must be 0 or 1.');values[spec.key]=n;}
+   else {const n=number(v[spec.key]);requireValue(!spec.integer || Number.isInteger(n),'Event counts must be whole numbers.');requireValue(spec.unit!=='%' || n<=100,'Percentage must be between 0 and 100.');requireValue(spec.type!=='alarm' || [0,1].includes(n),'Alarm must be 0 or 1.');values[spec.key]=n;}
  }
  requireValue(Object.keys(values).length,'Enter at least one reading.');
  db.energyRecords ||= [];let record=db.energyRecords.find(r=>r.date===date && r.kind===kind && r.shift===shift);
