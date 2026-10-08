@@ -20,3 +20,9 @@ test('supplied generator and electrical register stores cumulative indexes witho
  saveEnergyRecord(db,{kind:'meter',date:'2026-10-09',generatorMaintenance:9606,generatorActive:10293});assert.equal(db.energyRecords.length,3);
  assert.throws(()=>saveEnergyRecord(db,{kind:'meter',date:'2026-10-08',generatorStarts:1.5}),/whole numbers/);
 });
+
+test('clearing the last saved reading keeps its record and audit history',()=>{
+ const db=seed();db.role='Maintenance Engineer';const r=saveEnergyRecord(db,{kind:'meter',date:'2026-10-08',generatorHours:1});
+ saveEnergyRecord(db,{kind:'meter',date:'2026-10-08',generatorHours:'',clearEmpty:true});assert.deepEqual(r.values,{});assert.equal(r.history.length,2);assert.equal(db.energyRecords.length,1);
+ assert.throws(()=>saveEnergyRecord(db,{kind:'meter',date:'2026-10-09',clearEmpty:true}),/at least one/);
+});

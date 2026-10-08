@@ -70,6 +70,9 @@ test('portable file opens records from every list', async () => {
     await listeners.input({target:{dataset:{energyCell:`meter|Day|${date}|${parameter}`},value}});
   }
   await click('data-action','save-energy-table');
+  await listeners.input({target:{dataset:{energyCell:`meter|Day|${date.slice(0,8)}03|generatorHours`},value:''}});
+  await click('data-action','save-energy-table');
+  assert.equal(JSON.parse(saved).energyRecords.filter(r=>r.kind==='meter').length,1);
   let record=JSON.parse(saved).energyRecords.find(r=>r.date===date && r.kind==='meter');
   assert.equal(record.values.generatorHours,401.4);assert.equal(record.values.generatorStarts,605);
   await listeners.input({target:{dataset:{energyCell:`meter|Day|${date}|generatorHours`},value:'403.7'}});

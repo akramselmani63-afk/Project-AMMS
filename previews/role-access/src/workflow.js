@@ -787,8 +787,8 @@ export function saveEnergyRecord(db,v) {
    if(spec.type==='state'){requireValue(['Running','Stopped'].includes(v[spec.key]),'Invalid operating state.');values[spec.key]=v[spec.key];}
    else {const n=number(v[spec.key]);requireValue(!spec.integer || Number.isInteger(n),'Event counts must be whole numbers.');requireValue(spec.unit!=='%' || n<=100,'Percentage must be between 0 and 100.');requireValue(spec.type!=='alarm' || [0,1].includes(n),'Alarm must be 0 or 1.');values[spec.key]=n;}
  }
- requireValue(Object.keys(values).length,'Enter at least one reading.');
  db.energyRecords ||= [];let record=db.energyRecords.find(r=>r.date===date && r.kind===kind && r.shift===shift);
+ requireValue(Object.keys(values).length || (record && v.clearEmpty===true),'Enter at least one reading.');
  if(!record){record={id:nextId(db.energyRecords,'EN'),date,kind,shift,history:[]};db.energyRecords.push(record);}
  record.values=values;record.note=optional(v,'note');record.author=db.actor || db.role;record.authorRole=db.role;record.authorJob=db.actorJob || '';record.updatedAt=now();audit(db,record,'Reading saved',JSON.stringify(values));return record;
 }

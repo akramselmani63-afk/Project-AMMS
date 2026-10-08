@@ -321,9 +321,9 @@ function energyCell(kind,spec,date,value) {
 async function saveEnergyTable() {
  if(!energyDrafts.size)return;
  const invalid=[...document.querySelectorAll('[data-energy-cell]')].find(el=>!el.checkValidity());if(invalid){invalid.reportValidity();invalid.focus();return;}
- const groups=new Map();for(const [key,value] of energyDrafts){const [kind,shift,date,parameter]=key.split('|');const group=[kind,shift,date].join('|');if(!groups.has(group)){const existing=(db.energyRecords || []).find(r=>r.kind===kind && r.shift===shift && r.date===date);groups.set(group,{kind,shift,date,...existing?.values,note:existing?.note || ''});}groups.get(group)[parameter]=value;}
+ const groups=new Map();for(const [key,value] of energyDrafts){const [kind,shift,date,parameter]=key.split('|');const group=[kind,shift,date].join('|');if(!groups.has(group)){const existing=(db.energyRecords || []).find(r=>r.kind===kind && r.shift===shift && r.date===date);groups.set(group,{kind,shift,date,...existing?.values,note:existing?.note || '',clearEmpty:!!existing});}groups.get(group)[parameter]=value;}
  busy=true;
- try{for(const [group,values] of groups){await submitCommand('save-energy',undefined,values);for(const key of [...energyDrafts.keys()])if(key.startsWith(group+'|'))energyDrafts.delete(key);}render();flash(queuedLast?t('Saved offline; will be sent when connected.','Enregistré hors ligne ; sera transmis au retour de la connexion.'):t('Table saved.','Tableau enregistré.'));}
+ try{for(const [group,values] of groups){const specs=values.kind==='utility'?flow.utilityParameters:flow.energyParameters;if(values.clearEmpty || specs.some(spec=>values[spec.key]!=null && String(values[spec.key]).trim()!==''))await submitCommand('save-energy',undefined,values);for(const key of [...energyDrafts.keys()])if(key.startsWith(group+'|'))energyDrafts.delete(key);}render();flash(queuedLast?t('Saved offline; will be sent when connected.','Enregistré hors ligne ; sera transmis au retour de la connexion.'):t('Table saved.','Tableau enregistré.'));}
  catch(err){flash(errorText(err),'error');}finally{busy=false;}
 }
 function energyView() {
