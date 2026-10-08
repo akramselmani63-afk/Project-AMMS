@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "AMMS · AGRIDIAM Maintenance",
+  "short_name": "AMMS",
+  "description": "AGRIDIAM Maintenance Management System",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f5",
+  "theme_color": "#152c35",
+  "icons": [
+    { "src": "./assets/amms-pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/amms-pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

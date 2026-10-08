@@ -1,0 +1,16 @@
+import { cp, mkdir, rm, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import './build-notifications.js';
+const root = resolve('.');
+const dist = resolve('dist');
+for (const file of ['index.html','account-admin.html','styles.css','manifest.webmanifest','service-worker.js','src/app.js','src/account-admin.js','src/commands.js','src/data.js','src/workflow.js','src/storage.js','src/photos.js','src/source-assets.js','assets/agridiam-logo.png','assets/amms-app-icon-green-a.png','assets/amms-logo-monitoring.png','assets/amms-pwa-192.png','assets/amms-pwa-512.png']) await readFile(resolve(root,file));
+await rm(dist,{recursive:true,force:true});
+await mkdir(dist,{recursive:true});
+await cp(resolve(root,'index.html'),resolve(dist,'index.html'));
+await cp(resolve(root,'account-admin.html'),resolve(dist,'account-admin.html'));
+await cp(resolve(root,'styles.css'),resolve(dist,'styles.css'));
+for (const file of ['manifest.webmanifest','service-worker.js']) await cp(resolve(root,file),resolve(dist,file));
+await mkdir(resolve(dist,'src'));
+for (const file of ['access.js','app.js','account-admin.js','commands.js','data.js','workflow.js','statistics.js','storage.js','photos.js','source-assets.js']) await cp(resolve(root,'src',file),resolve(dist,'src',file));
+await cp(resolve(root,'assets'),resolve(dist,'assets'),{recursive:true});
+console.log('Built static app in dist/');

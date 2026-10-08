@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AMMS · Account administration</title>
+  <style>
+    :root{font-family:Segoe UI,Arial,sans-serif;color:#203844;background:#f2f6f8;font-synthesis:none}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1040px;margin:0 auto;padding:36px 22px 60px}header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}header img{width:180px;height:70px;object-fit:contain;object-position:left}h1{font-size:28px;margin:0;color:#123f71}h2{font-size:18px;margin:0 0 18px}.card{background:white;border:1px solid #dce6ec;border-radius:12px;padding:24px;margin:18px 0;box-shadow:0 4px 20px #1d45620b}.intro,.hint{color:#5d737e;line-height:1.55}.intro{margin-top:0}.hint{font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:grid;gap:6px}.field span{font-size:13px;font-weight:700}.field input,.field select{width:100%;height:42px;border:1px solid #cad8df;border-radius:6px;padding:8px 10px;font:inherit;background:#fff}.wide{grid-column:1/-1}.actions{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}button{font:inherit;cursor:pointer;border-radius:6px;min-height:40px;padding:8px 14px;border:1px solid #c7d7df;background:#fff;color:#174d7d;font-weight:700}button.primary{background:#16834e;border-color:#16834e;color:white}button:hover{filter:brightness(.96)}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #e1ad43;outline-offset:2px}.message{min-height:20px;color:#a43131;font-size:13px}.users{width:100%;border-collapse:collapse}.users th,.users td{text-align:left;padding:12px 9px;border-bottom:1px solid #e5ecef;vertical-align:top}.users th{font-size:12px;color:#617987}.users td{font-size:14px}.status{display:inline-block;border-radius:99px;padding:4px 9px;background:#eaf5ee;color:#237748;font-size:12px;white-space:nowrap}.status.pending{background:#fff4db;color:#87590d}.table-wrap{overflow:auto}.code{padding:15px;background:#f0f7f4;border:1px solid #cde6d6;border-radius:8px;font:700 19px Consolas,monospace;word-break:break-all;color:#145c37}.notice{background:#fff8e8;border-left:4px solid #e5ae40;padding:12px 14px;border-radius:4px;font-size:13px;line-height:1.5}.hidden{display:none!important}.top-link{font-size:13px;color:#174d7d}@media(max-width:640px){.wrap{padding:20px 14px}.card{padding:17px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}header{align-items:flex-start;flex-direction:column}.users th:nth-child(3),.users td:nth-child(3){display:none}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header><img src="./assets/agridiam-logo.png" alt="AGRIDIAM"><h1>Account administration</h1><a class="top-link" href="./">Open AMMS</a></header>
+    <p class="intro">Create company accounts and issue one-time activation codes. Passwords are never shown or stored in readable form.</p>
+    <section class="card" aria-labelledby="access-heading">
+      <h2 id="access-heading">Administrator access</h2>
+      <form id="connect-form" class="grid">
+        <label class="field wide"><span>Server administrator key</span><input name="key" type="password" autocomplete="off" required><small>Enter the key shown in the server startup window. It stays in this page's memory only.</small></label>
+        <div class="actions wide"><button class="primary" type="submit">Connect and load accounts</button><p id="connect-message" class="message" role="status"></p></div>
+      </form>
+    </section>
+    <section id="workspace" class="hidden">
+      <section class="card" aria-labelledby="create-heading">
+        <h2 id="create-heading">Create account</h2>
+        <form id="user-form" class="grid">
+          <label class="field"><span>First name</span><input name="name" autocomplete="given-name" maxlength="80" required></label>
+          <label class="field"><span>Surname</span><input name="surname" autocomplete="family-name" maxlength="80" required></label>
+          <label class="field"><span>Job title</span><input name="job" maxlength="100" required></label>
+          <label class="field"><span>Company email</span><input name="email" type="email" autocomplete="email" required></label>
+          <label class="field wide"><span>AMMS role</span><select name="role" required><option>Employee</option><option>Maintenance Engineer</option><option>Maintenance Responsible</option><option>HSE</option><option>Purchasing Department</option><option>Viewer</option></select></label>
+          <div class="actions wide"><button class="primary" type="submit">Create account and issue code</button><p id="user-message" class="message" role="status"></p></div>
+        </form>
+      </section>
+      <section id="code-panel" class="card hidden" aria-live="polite">
+        <h2>One-time activation code</h2>
+        <p id="code-recipient"></p><div id="activation-code" class="code"></div>
+        <div class="actions"><button type="button" id="copy-code">Copy code</button><button type="button" id="dismiss-code">Done</button></div>
+        <p class="hint">Share it privately. The user chooses a new password in AMMS under <strong>Create account</strong>. The code can be used once.</p>
+      </section>
+      <section class="card" aria-labelledby="users-heading">
+        <h2 id="users-heading">Company accounts</h2>
+        <p class="notice">Resetting access immediately invalidates the old password and signs the user out. The reset code is shown once; the user creates a new password in AMMS.</p>
+        <div class="table-wrap"><table class="users"><thead><tr><th>Name</th><th>Email</th><th>Job</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody id="user-list"></tbody></table></div>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="./src/account-admin.js"></script>
+</body>
+</html>
