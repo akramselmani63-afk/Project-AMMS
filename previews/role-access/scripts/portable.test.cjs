@@ -44,6 +44,9 @@ test('portable file opens records from every list', async () => {
   assert.doesNotMatch(app.innerHTML,/id="kpi-section"/, 'overview keeps KPI statistics on its own page');
   await click('data-page','Energy');
   assert.match(app.innerHTML,/data-energy-cell=/);
+  assert.match(app.innerHTML,/equipment-register energy-register/);
+  assert.match(app.innerHTML,/<details class="equipment-node energy-register-section" open>/);
+  assert.match(app.innerHTML,/data-action="energy-form"/);
   const originalQuery=document.querySelector;
   let selected;
   document.querySelector=selector=>{selected=selector;return {focus(){},select(){}};};
