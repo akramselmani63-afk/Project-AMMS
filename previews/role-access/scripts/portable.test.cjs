@@ -27,6 +27,11 @@ test('portable file opens records from every list', async () => {
     console: { warn() {} }, structuredClone
   });
   vm.runInContext(script, context);
+  vm.runInContext(readFileSync(resolve(root,'src/app.js'),'utf8').match(/function utilityColor\(spec,value\) \{[\s\S]*?\n\}/)[0],context);
+  assert.equal(vm.runInContext('utilityColor({min:6,max:8},6)',context),'utility-low');
+  assert.equal(vm.runInContext('utilityColor({min:6,max:8},8)',context),'utility-high');
+  assert.equal(vm.runInContext('utilityColor({min:6,max:8},7)',context),'utility-normal');
+  assert.equal(vm.runInContext('utilityColor({min:6,max:8},null)',context),'');
   const workspace = vm.runInContext('workflow.seed({examples:true})', context);
   workspace.actor = 'Akram Selmani';
   context.workspace = workspace;
