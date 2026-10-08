@@ -48,7 +48,7 @@ function view(workspace,user,users) {
   const accounts=Object.values(users || {});
   const add=(name,role)=>{if(!name)return;const matches=accounts.filter(a=>personName(a)===name && (!role || activeRole(a.role)===role));if(matches.length===1 && matches[0].job)result.personJobs[name+'|'+(role || '')]=matches[0].job;};
   const visit=value=>{if(!value || typeof value!=='object')return;if(Array.isArray(value)){value.forEach(visit);return;}for(const [name,role] of [[value.reportedBy,value.reportedRole],[value.requestedBy,value.requestedRole],[value.author,value.authorRole],[value.actor,value.role]])add(name,role);Object.values(value).forEach(visit);};
-  for(const key of ['requests','workOrders','reports','partRequests','inventory','preventive'])visit(result[key]);
+  for(const key of ['requests','workOrders','reports','partRequests','inventory','preventive','energyRecords'])visit(result[key]);
   add(user.name,user.role);return result;
 }
 async function workspace() {

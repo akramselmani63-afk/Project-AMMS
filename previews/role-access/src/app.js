@@ -22,6 +22,7 @@ function finishSplash(immediate=false) {
 let trendEquipment='',trendAnnual=false,trendPeriod=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}).slice(0,7);
 let db, page='Overview', query='', viewFilter='All', reportTab='interventions', priorityScope='open', filterEquipment='', filterPriority='', filterOrigin='', filterDate='', detail=null, dialog=null, pendingPhotos=[], pendingProforma=null, busy=false, signedIn=false, serverMode=false, serverAvailable=false, drawerOpen=false, wizardStep=0, authMode='signin', profileRole=null, profileReturn=null;
 let serverEmail='', pendingCommands=[], syncing=false, refreshing=false, queuedLast=false, syncError='';
+let energyMonth=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}).slice(0,7),energyTab='energy',utilityShift='Day';
 const selectedParts=new Set();
 let kpiDays=30, kpiEquipment='';
 try { signedIn=sessionStorage.getItem('amms-access-preview-demo-session')==='1'; } catch {}
@@ -84,10 +85,12 @@ const labels={Overview:['Overview','Vue d’ensemble'],KPI:['KPI statistics','St
 labels.Profile=['Profile','Profil'];
 labels.Notifications=['Notification history','Historique des notifications'];
 labels.Inventory=['Stock & inventory','Stock et inventaire'];
+labels.Energy=['Energy balance','Bilan énergétique'];
 const navPaths={Overview:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',Equipment:'M4 7h16v10H4z M8 7V4h8v3 M8 17v3h8v-3',Requests:'M8 4h10l3 3v13H8z M12 12h5 M12 16h5 M3 8v12',Work:'M5 4h14v17H5z M9 3h6v3H9z M9 12h6 M9 16h6',Preventive:'M12 3a9 9 0 1 0 9 9 M12 7v5l4 2',Parts:'M4 8l8-4 8 4v9l-8 4-8-4z M4 8l8 4 8-4 M12 12v9',Reports:'M5 3h11l3 3v15H5z M9 11h6 M9 15h6 M9 18h4',Roles:'M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 20v-2a4 4 0 0 0-3-3.87 M16 2.13a4 4 0 0 1 0 7.75'};
 navPaths.Profile='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a8 8 0 0 1 16 0v2';
 navPaths.Notifications='M6 17V9a6 6 0 0 1 12 0v8l2 2H4z M10 22h4';
 navPaths.Inventory='M3 3h18v18H3z M3 9h18 M9 9v12 M15 9v12';
+navPaths.Energy='M13 2L4 14h7l-1 8 10-12h-7z';
 navPaths.KPI='M3 3v18h18 M8 16v-5 M13 16V7 M18 16V4';
 const navIcon=key=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${navPaths[key]}"></path></svg>`;
 function notificationButton() {
@@ -252,6 +255,7 @@ function restrictedOverview() {
   return heading(title,t('Actions and indicators relevant to your role.','Actions et indicateurs liés à votre rôle.'),employee || production?button(t('New intervention request','Nouvelle demande d’intervention'),'new-request','',true,true):'')+(employee?'':restrictedKpis(false))+`<div class="role-overview-layout ${hse || production?'with-approvals':''}">${hse || production?responsibleQueue():''}<section class="panel role-records-panel"><div class="panel-head"><h2>${employee?t('My intervention requests','Mes demandes d’intervention'):production?t('Requests and safety reviews','Demandes et validations de sécurité'):hse?t('Interventions · MCR and utilities','Interventions · MCR et utilités'):t('Purchasing actions','Actions achats')}</h2></div>${overviewRecords(items,collection)}</section></div>`;
 }
 function view() {
+  if(page==='Energy') return energyView();
   if(page==='KPI') return kpiView();
   if(page==='Notifications') return notificationsView();
   if(page==='Inventory') return inventoryView();
@@ -298,6 +302,29 @@ function notificationsView() {
   const feed=flow.notificationFeed(db).filter(n=>!filterDate || flow.localDay(n.at)===filterDate);
   const items=feed.filter(n=>(viewFilter==='All' || n.status===viewFilter) && (!query || [n.title,n.id,label(n.action),n.actor].join(' ').toLowerCase().includes(query)));
   return heading(t('Notification history','Historique des notifications'),t('Pending actions and a permanent record of completed events.','Actions à traiter et historique permanent des événements.'))+`<div class="notification-history-filters">${statusTabs(feed,['All','Pending','Resolved','History'])}<label class="field"><span>${t('Date','Date')}</span><input type="date" data-record-filter="date" value="${esc(filterDate)}"></label></div><section class="panel notification-list notification-history-list"><div class="panel-head"><h2>${t('Notifications','Notifications')}</h2><span>${items.length} ${t('results','résultats')}</span></div>${items.map(n=>`<button type="button" class="notification-history-row ${n.status==='Pending'?'pending':''}" data-action="open" data-id="${n.collection}:${esc(n.id)}"><span class="notification-history-time">${esc(displayTime(n.at))}</span><span class="notification-history-content"><strong>${esc(label(n.action))}</strong><span>${esc(n.title)}</span><small>${esc(n.id)}${n.actor?' · '+esc(person(n.actor,n.role,n.job)):''}</small>${n.equipmentId?`<small>${esc(path(n.equipmentId))}</small>`:''}</span><span class="notification-history-status">${badge(n.status)}<span aria-hidden="true">→</span></span></button>`).join('') || empty()}</section>`;
+}
+function energyView() {
+ const records=(db.energyRecords || []).filter(r=>r.date.startsWith(energyMonth));
+ const writable=['Maintenance Engineer','Maintenance Responsible'].includes(db.role);
+ const amount=n=>n.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:2});
+ const energy=records.filter(r=>r.kind==='energy').sort((a,b)=>b.date.localeCompare(a.date));
+ const totals=[['electricity',t('Electricity','Électricité'),'kWh'],['water',t('Water','Eau'),'m³'],['diesel',t('Diesel','Gasoil'),'L']];
+ const toolbar=`<div class="energy-toolbar"><label class="field"><span>${t('Month','Mois')}</span><input type="month" data-energy-filter="month" value="${esc(energyMonth)}"></label>${energyTab==='utility'?`<label class="field"><span>${t('Shift','Poste')}</span><select data-energy-filter="shift"><option value="Day" ${utilityShift==='Day'?'selected':''}>${t('Day','Jour')}</option><option value="Night" ${utilityShift==='Night'?'selected':''}>${t('Night','Nuit')}</option></select></label>`:''}${button(energyTab==='energy'?t('Record consumption','Saisir une consommation'):t('Record utility checks','Saisir les contrôles utilités'),energyTab==='energy'?'energy-form':'utility-form','',writable,true)}</div>`;
+ const tabs=`<div class="status-tabs" role="group" aria-label="${t('Energy sections','Rubriques énergie')}">${[['energy',t('Energy balance','Bilan énergétique')],['utility',t('Utility parameters','Paramètres utilités')]].map(([key,title])=>`<button type="button" data-energy-tab="${key}" aria-pressed="${energyTab===key}" class="${energyTab===key?'active':''}">${title}</button>`).join('')}</div>`;
+ let content;
+ if(energyTab==='energy') content=`<section class="panel energy-summary"><h2>${t('Recorded monthly consumption','Consommations mensuelles enregistrées')}</h2><dl>${totals.map(([key,title,unit])=>`<div><dt>${title}</dt><dd>${energy.some(r=>r.values[key]!=null)?amount(energy.reduce((sum,r)=>sum+(r.values[key] || 0),0)):'—'} <small>${unit}</small></dd><small>${energy.filter(r=>r.values[key]!=null).length} ${t('days recorded','jours renseignés')}</small></div>`).join('')}</dl><p>${t('Enter daily consumed quantities, not cumulative meter indexes. Missing readings are not zero. Utilities checks do not calculate energy use.','Saisissez les quantités consommées par jour, pas les index cumulés des compteurs. Une case vide n’est pas un zéro. Les contrôles utilités ne calculent pas les consommations.')}</p></section><div class="table-wrap"><table><thead><tr><th>${t('Date','Date')}</th>${totals.map(([,title,unit])=>`<th>${title} (${unit})</th>`).join('')}<th>${t('Recorded by','Renseigné par')}</th><th></th></tr></thead><tbody>${energy.map(r=>`<tr><td>${esc(r.date)}</td>${totals.map(([key])=>`<td>${r.values[key]==null?'—':amount(r.values[key])}</td>`).join('')}<td>${esc(person(r.author,r.authorRole,r.authorJob))}</td><td>${button(t('Modify','Modifier'),'energy-form',r.id,writable)}</td></tr>`).join('')}</tbody></table></div>${energy.length?'':empty()}`;
+ else {
+ const days=new Date(Number(energyMonth.slice(0,4)),Number(energyMonth.slice(5)),0).getDate();
+ const readingFor=day=>records.find(r=>r.kind==='utility' && r.shift===utilityShift && r.date===energyMonth+'-'+String(day).padStart(2,'0'));
+ content=`<p class="legend">${t('Reference ranges copied from your form. Red cells indicate an out-of-range reading or an alarm; blanks mean no reading.','Plages de référence reprises de votre formulaire. Une case rouge indique une mesure hors plage ou une alarme ; une case vide signifie aucune mesure.')}</p><div class="energy-matrix" tabindex="0" role="region" aria-label="${t('Monthly utility checks','Contrôles mensuels des utilités')}"><table><thead><tr><th>${t('Installation','Installation')}</th><th>${t('Zone','Zone')}</th><th>${t('Parameter','Paramètre')}</th><th>Min</th><th>Max</th>${Array.from({length:days},(_,i)=>`<th scope="col">${i+1}</th>`).join('')}</tr></thead><tbody>${flow.utilityParameters.map(spec=>`<tr><th scope="row">${t(...spec.installation)}</th><td>${t(...spec.zone)}</td><td>${t(...spec.title)}${spec.unit?' ('+spec.unit+')':''}</td><td>${spec.min ?? '—'}</td><td>${spec.max ?? '—'}</td>${Array.from({length:days},(_,i)=>{const r=readingFor(i+1),v=r?.values[spec.key],alert=v!=null && (spec.type==='alarm'?v===1:spec.min!=null && (v<spec.min || v>spec.max));return `<td class="${alert?'utility-alert':''}">${v==null?'—':spec.type==='state'?v==='Running'?t('Running','Marche'):t('Stopped','Arrêt'):esc(v)}${r && writable?`<button type="button" class="utility-edit" data-action="utility-form" data-id="${esc(r.id)}" aria-label="${t('Modify reading on ','Modifier le relevé du ')+r.date}">${t('Edit','Modifier')}</button>`:''}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>`;
+ }
+ return heading(t('Energy balance','Bilan énergétique'),t('Daily consumption and utilities monitoring.','Consommations journalières et suivi des utilités.'))+tabs+toolbar+content;
+}
+function energyForm(kind,id) {
+ const r=(db.energyRecords || []).find(r=>r.id===id),v=r?.values || {};
+ const date=r?.date || (flow.today().startsWith(energyMonth)?flow.today():energyMonth+'-01');
+ const numeric=(key,title,max)=>field(key,title,'number',v[key] ?? '',false).replace('step="1"',`step="0.01" ${max!=null?'max="'+max+'"':''}`);
+ return `<input type="hidden" name="kind" value="${kind}">${field('date',t('Reading date','Date du relevé'),'date',date)}${kind==='utility'?select('shift',t('Shift','Poste'),[['Day',t('Day','Jour')],['Night',t('Night','Nuit')]],r?.shift || utilityShift):''}<p class="modal-context">${t('Saving the same date and shift updates that reading and keeps its change history.','L’enregistrement de la même date et du même poste met à jour le relevé et conserve son historique.')}</p>${kind==='energy'?[['electricity',t('Electricity consumed (kWh)','Électricité consommée (kWh)')],['water',t('Water consumed (m³)','Eau consommée (m³)')],['diesel',t('Diesel consumed (L)','Gasoil consommé (L)')]].map(([key,title])=>numeric(key,title)).join(''):flow.utilityParameters.map(spec=>{const title=t(...spec.zone)+' · '+t(...spec.title)+(spec.unit?' ('+spec.unit+')':'');return spec.type==='state'?select(spec.key,title,[['',t('Not recorded','Non renseigné')],['Running',t('Running','Marche')],['Stopped',t('Stopped','Arrêt')]],v[spec.key] || ''):spec.type==='alarm'?select(spec.key,title,[['',t('Not recorded','Non renseigné')],['0',t('0 — No alarm','0 — Aucune alarme')],['1',t('1 — Alarm','1 — Alarme')]],v[spec.key]==null?'':String(v[spec.key])):numeric(spec.key,title,spec.unit==='%'?100:undefined);}).join('')}${textArea('note',t('Observation','Observation'),r?.note || '')}`;
 }
 function inventoryView() {
   const items=db.inventory.filter(match);
@@ -434,6 +461,8 @@ function modal() {
     'stock-move':[t('Record stock movement','Enregistrer un mouvement'),`${select('type',t('Movement','Mouvement'),allowed('equipment')?[['in',t('Stock in','Entrée')],['out',t('Stock out','Sortie')]]:[['in',t('Stock in','Entrée')]])}${field('quantity',t('Quantity','Quantité'),'number',1)}${textArea('note',t('Receipt reference / reason','Référence de réception / motif'))}`],
     'new-pm':[t('New preventive plan','Nouveau plan préventif'),`${field('title',t('Task','Tâche'))}${equipmentField()}${field('intervalDays',t('Interval in days','Périodicité en jours'),'number',30)}${field('nextDue',t('Next due','Prochaine échéance'),'date',flow.today())}${textArea('instructions',t('Instructions','Instructions'))}`],
     'new-report':[t('New shift report','Nouveau rapport de permanence'),`${field('date',t('Date','Date'),'date',flow.today())}${select('shift',t('Shift','Poste'),['Day','Night'])}${select('equipmentId',t('Equipment / zone','Équipement / zone'),[['',t('All equipment','Tous les équipements')],...orderedEquipment().map(e=>[e.id,path(e.id)])])}${textArea('summary',t('Shift observations','Observations du poste'))}${textArea('handover',t('Handover / follow-up','Consignes / suivi'),'',false)}`],
+    'energy-form':[t('Record daily consumption','Saisir les consommations du jour'),energyForm('energy',id)],
+    'utility-form':[t('Record utility checks','Saisir les contrôles utilités'),energyForm('utility',id)],
     'approve-report':[t('Approve report','Approuver le rapport'),note]
   };
   const form=forms[type]; if(!form) return '';
@@ -515,6 +544,7 @@ function printRecordContents() {
 }
 document.addEventListener('click',async e=>{
   if(e.target.closest('[data-part-select]')) return;
+  const energyTabButton=e.target.closest('[data-energy-tab]');if(energyTabButton && !busy){energyTab=energyTabButton.dataset.energyTab;render();return;}
   const nav=e.target.closest('[data-page]'); if(nav && !busy) { if(!canSeePage(db.role,nav.dataset.page)) return; if(nav.dataset.page==='Profile') { if(page!=='Profile') profileReturn={page,detail}; profileRole=db.role; } page=nav.dataset.page==='Work'?'Requests':nav.dataset.page; detail=null; dialog=null; drawerOpen=false; query=''; viewFilter='All'; filterEquipment=''; filterPriority=''; filterOrigin=''; filterDate=''; if(page==='Reports') reportTab='interventions'; render(); return; }
   const scope=e.target.closest('[data-priority-scope]'); if(scope && !busy) { priorityScope=scope.dataset.priorityScope==='all'?'all':'open'; render(); return; }
   const tab=e.target.closest('[data-report-tab]'); if(tab && !busy) { reportTab=tab.dataset.reportTab; viewFilter='All'; render(); return; }
@@ -557,6 +587,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',async e=>{
   const el=e.target;
+  if(el.dataset.energyFilter){if(el.dataset.energyFilter==='month'){if(!/^\d{4}-\d{2}$/.test(el.value))return;energyMonth=el.value;}else utilityShift=el.value;render();return;}
   if(el.dataset.partSelect) { if(el.checked) selectedParts.add(el.dataset.partSelect); else selectedParts.delete(el.dataset.partSelect); render(); return; }
   if(el.dataset.trendFilter) { if(el.dataset.trendFilter==='mode') trendAnnual=el.value==='year';else if(el.dataset.trendFilter==='equipment') trendEquipment=el.value;else if(el.dataset.trendFilter==='year') trendPeriod=el.value+trendPeriod.slice(4);else trendPeriod=el.value;render();return; }
   if(el.dataset.kpiFilter) { if(el.dataset.kpiFilter==='days') kpiDays=Number(el.value); else kpiEquipment=el.value; render(); document.querySelector(`[data-kpi-filter="${el.dataset.kpiFilter}"]`)?.focus(); return; }
@@ -605,7 +636,7 @@ document.addEventListener('submit',async e=>{
   if(type==='complete-work' && v.completedAt===dialog.completionDefault) delete v.completedAt;
   busy=true; const submit=e.target.querySelector('[type=submit]'); submit.disabled=true;
   try {
-    await submitCommand(type,id,v);
+    await submitCommand(['energy-form','utility-form'].includes(type)?'save-energy':type,['energy-form','utility-form'].includes(type)?undefined:id,v);
     dialog=null; pendingPhotos=[]; pendingProforma=null; render(); flash(queuedLast?t('You are offline. This submission will be sent when the connection returns.','Vous êtes hors ligne. Cet envoi sera transmis au retour de la connexion.'):serverMode?t('Saved on the server.','Enregistré sur le serveur.'):t('Saved in this browser.','Enregistré dans ce navigateur.'),queuedLast?'warning':'success');
   } catch(err) { document.querySelector('#form-error').textContent=errorText(err); flash(errorText(err),'error'); submit.disabled=false; }
   finally { busy=false; }

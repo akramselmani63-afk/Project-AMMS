@@ -12,6 +12,7 @@ export function applyCommand(db,command) {
 function executeCommand(db, command) {
   const {type, id, values = {}} = command;
   switch (type) {
+    case 'save-energy': return flow.saveEnergyRecord(db,values);
     case 'remove-intervention': return flow.removeIntervention(db,id);
     case 'start-work': return flow.updateWork(db,id,'start');
     case 'generate-pm': return flow.generatePM(db,id);
@@ -38,7 +39,7 @@ function executeCommand(db, command) {
   }
 }
 
-const collections=['equipment','requests','workOrders','preventive','partRequests','reports','inventory'];
+const collections=['equipment','requests','workOrders','preventive','partRequests','reports','inventory','energyRecords'];
 const links={equipment:[['equipment','parentId'],['requests','equipmentId'],['workOrders','equipmentId'],['preventive','equipmentId'],['partRequests','equipmentId'],['reports','equipmentId']],requests:[['workOrders','requestId'],['reports','requestId']],workOrders:[['partRequests','workOrderId'],['reports','linkedWorkOrderId']],preventive:[['requests','pmId'],['workOrders','pmId']],partRequests:[],reports:[]};
 export function recordIds(db) { return Object.fromEntries(collections.map(key=>[key,new Set((db[key] || []).map(item=>item.id))])); }
 export function assignCreated(db,before,created) {
@@ -49,7 +50,7 @@ export function assignCreated(db,before,created) {
     for(let i=0;i<added.length;i++) {
       const old=added[i].id, replacement=ids[i];
       const legacyRequestId=key==='requests' && /^IR-[a-f0-9]{32}$/.test(replacement || '');
-      const valid=typeof replacement==='string' && (key==='requests'?legacyRequestId || /^IR-\d{8}-\d{6}(?:-\d{2,})?$/.test(replacement):/^(EQ|WO|PM|SPR|SR|STK)-[a-f0-9]{32}$/.test(replacement));
+      const valid=typeof replacement==='string' && (key==='requests'?legacyRequestId || /^IR-\d{8}-\d{6}(?:-\d{2,})?$/.test(replacement):/^(EQ|WO|PM|SPR|SR|STK|EN)-[a-f0-9]{32}$/.test(replacement));
       if(!valid) throw new Error('Invalid record ID.');
       let id=legacyRequestId?flow.requestIdAt(added[i].createdAt,db.requests.filter(item=>item!==added[i])):replacement;
       if(db[key].some(item=>item!==added[i] && item.id===replacement)) {
@@ -64,4 +65,4 @@ export function assignCreated(db,before,created) {
     }
   }
 }
-export function newRecordIds(db,before) { return Object.fromEntries(collections.map(key=>[key,(db[key] || []).filter(item=>!before[key].has(item.id)).map(item=>key==='requests'?item.id:`${{equipment:'EQ',workOrders:'WO',preventive:'PM',partRequests:'SPR',reports:'SR',inventory:'STK'}[key]}-${crypto.randomUUID().replaceAll('-','')}`)])); }
+export function newRecordIds(db,before) { return Object.fromEntries(collections.map(key=>[key,(db[key] || []).filter(item=>!before[key].has(item.id)).map(item=>key==='requests'?item.id:`${{equipment:'EQ',workOrders:'WO',preventive:'PM',partRequests:'SPR',reports:'SR',inventory:'STK',energyRecords:'EN'}[key]}-${crypto.randomUUID().replaceAll('-','')}`)])); }

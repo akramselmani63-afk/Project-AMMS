@@ -48,6 +48,7 @@ export function audit(db,item,action,note='') {
   (item.history ||= []).push(event); return event;
 }
 export function migrate(db) {
+  db.energyRecords ||= [];
   db.inventory ||= [];
   syncEquipmentStates(db);
   for(const r of db.requests || []) if(r.hseApproval && !['Closed','Legacy completed','Rejected'].includes(r.status) && (r.hseApproval.role || 'HSE')!==safetyReviewer(db,r)) {
@@ -487,4 +488,30 @@ export function syncEquipmentStates(db) {
   const works=(db.workOrders || []).filter(w=>w.equipmentId===equipment.id && !['Closed','Legacy completed'].includes(w.status));
   equipment.status=works.some(w=>w.status==='In progress')?'Under maintenance':requests.some(r=>['Equipment stopped','Équipement arrêté'].includes(r.impact))?'Stopped':'Running';
  }
+}
+
+export const utilityParameters=[
+ {key:'airPressure',installation:['Compressed air','Air comprimé'],zone:['Air circuit','Circuit air'],title:['Pressure','Pression'],unit:'barg',min:6,max:8},
+ {key:'compressorState',installation:['Compressed air','Air comprimé'],zone:['Kaeser','Kaeser'],title:['Operating state','État'],type:'state'},
+ {key:'compressorPressure',installation:['Compressed air','Air comprimé'],zone:['Kaeser','Kaeser'],title:['Pressure','Pression'],unit:'barg',min:6,max:8},
+ {key:'waterLevel',installation:['Water tank','Bâche à eau'],zone:['Water tank','Bâche à eau'],title:['Water level','Niveau d’eau'],unit:'%',min:50,max:90},
+ {key:'pumpState',installation:['Water tank','Bâche à eau'],zone:['Water tank','Bâche à eau'],title:['Pump operation','Fonctionnement pompe'],type:'state'},
+ {key:'upsAlarm',installation:['440 kVA generator','Groupe électrogène 440 kVA'],zone:['UPS1','UPS1'],title:['Alarm (0: none / 1: alarm)','Alarme (0 : aucune / 1 : alarme)'],type:'alarm'},
+ {key:'dieselLevel',installation:['440 kVA generator','Groupe électrogène 440 kVA'],zone:['UPS1','UPS1'],title:['Diesel level','Niveau gasoil'],unit:'%',min:40,max:90}
+];
+export function saveEnergyRecord(db,v) {
+ requireValue(maintenance.includes(db.role),'This role cannot record energy or utility readings.');
+ const date=required(v,'date');requireValue(/^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date)) && new Date(date).toISOString().slice(0,10)===date,'Enter a valid reading date.');
+ const kind=v.kind;requireValue(['energy','utility'].includes(kind),'Invalid reading type.');
+ const shift=kind==='utility'?v.shift:'Day';requireValue(['Day','Night'].includes(shift),'Invalid shift.');
+ const values={};
+ for(const spec of kind==='utility'?utilityParameters:[{key:'electricity'},{key:'water'},{key:'diesel'}]) {
+   if(v[spec.key]==null || String(v[spec.key]).trim()==='')continue;
+   if(spec.type==='state'){requireValue(['Running','Stopped'].includes(v[spec.key]),'Invalid operating state.');values[spec.key]=v[spec.key];}
+   else {const n=number(v[spec.key]);requireValue(spec.unit!=='%' || n<=100,'Percentage must be between 0 and 100.');requireValue(spec.type!=='alarm' || [0,1].includes(n),'Alarm must be 0 or 1.');values[spec.key]=n;}
+ }
+ requireValue(Object.keys(values).length,'Enter at least one reading.');
+ db.energyRecords ||= [];let record=db.energyRecords.find(r=>r.date===date && r.kind===kind && r.shift===shift);
+ if(!record){record={id:nextId(db.energyRecords,'EN'),date,kind,shift,history:[]};db.energyRecords.push(record);}
+ record.values=values;record.note=optional(v,'note');record.author=db.actor || db.role;record.authorRole=db.role;record.authorJob=db.actorJob || '';record.updatedAt=now();audit(db,record,'Reading saved',JSON.stringify(values));return record;
 }

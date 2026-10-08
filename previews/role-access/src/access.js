@@ -2,11 +2,11 @@
 export const rolePages={
   Employee:['Equipment','Requests','Notifications','Profile'],
   'Production Responsible':['Overview','KPI','Equipment','Requests','Preventive','Notifications','Profile'],
-  'Maintenance Engineer':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
-  'Maintenance Responsible':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile'],
-  HSE:['Overview','KPI','Equipment','Requests','Preventive','Notifications','Profile'],
+  'Maintenance Engineer':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile'],
+  'Maintenance Responsible':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile'],
+  HSE:['Overview','KPI','Equipment','Requests','Preventive','Energy','Notifications','Profile'],
   'Purchasing Department':['Parts','Notifications','Profile'],
-  Viewer:['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Notifications','Profile']
+  Viewer:['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile']
 };
 export const canSeePage=(role,page)=>(rolePages[role] || []).includes(page);
 const pick=(item,fields)=>Object.fromEntries(fields.filter(key=>key in item).map(key=>[key,item[key]]));
@@ -18,6 +18,7 @@ export function workspaceForRole(workspace,user) {
   const {appliedCommands,...result}=workspace;
   result.role=user.role;result.actor=user.name;result.actorEmail=user.email;result.accessProjection=true;
   if(['Maintenance Engineer','Maintenance Responsible','Viewer'].includes(user.role)) return result;
+  result.energyRecords=user.role==='HSE'?(workspace.energyRecords || []):[];
   result.publicKpis={};
   result.equipment=workspace.equipment.map(e=>pick(e,equipmentFields));
   result.documents=[];result.parts=[];result.reports=[];
