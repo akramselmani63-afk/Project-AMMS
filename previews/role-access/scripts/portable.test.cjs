@@ -20,9 +20,9 @@ test('portable file opens records from every list', async () => {
   };
   let saved;
   const context = vm.createContext({
-    document, performance: { now: () => 0 }, setTimeout() {},
+    document, AMMSNotifications:{notify(){}}, performance: { now: () => 0 }, setTimeout() {},
     sessionStorage: { getItem: () => '1' },
-    localStorage: { getItem: () => saved },
+    localStorage: { getItem: () => saved, setItem: (key,value) => {saved=value;} },
     indexedDB: { open() { throw Error('Unavailable in this test'); } },
     console: { warn() {} }, structuredClone
   });
@@ -42,6 +42,30 @@ test('portable file opens records from every list', async () => {
   const click = async (attribute, value) => listeners.click({ target: { closest: selector => selector === `[${attribute}]` ? { dataset: { [attribute === 'data-page' ? 'page' : attribute === 'data-report-tab' ? 'reportTab' : 'action']: value, id: value } } : null } });
   assert.match(app.innerHTML,/data-page="KPI"/, 'KPI statistics has a sliding-menu entry');
   assert.doesNotMatch(app.innerHTML,/id="kpi-section"/, 'overview keeps KPI statistics on its own page');
+  await click('data-page','Energy');
+  assert.match(app.innerHTML,/data-energy-cell=/);
+  const originalQuery=document.querySelector;
+  let selected;
+  document.querySelector=selector=>{selected=selector;return {focus(){},select(){}};};
+  for(const [key,row,col] of [['Enter',3,4],['ArrowDown',3,4],['ArrowUp',1,4],['ArrowLeft',2,3],['ArrowRight',2,5]]){
+    let prevented=false;
+    await listeners.keydown({key,target:{closest:()=>({dataset:{gridRow:'2',gridCol:'4'}})},preventDefault(){prevented=true;}});
+    assert.ok(prevented);assert.equal(selected,`[data-energy-cell][data-grid-row="${row}"][data-grid-col="${col}"]`);
+  }
+  document.querySelector=originalQuery;
+  document.querySelectorAll=()=>[];
+  const date=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}).slice(0,7)+'-02';
+  for(const [parameter,value] of [['generatorHours','401.4'],['generatorStarts','605']]){
+    await listeners.input({target:{dataset:{energyCell:`meter|Day|${date}|${parameter}`},value}});
+  }
+  await click('data-action','save-energy-table');
+  let record=JSON.parse(saved).energyRecords.find(r=>r.date===date && r.kind==='meter');
+  assert.equal(record.values.generatorHours,401.4);assert.equal(record.values.generatorStarts,605);
+  await listeners.input({target:{dataset:{energyCell:`meter|Day|${date}|generatorHours`},value:'403.7'}});
+  await click('data-action','save-energy-table');
+  const records=JSON.parse(saved).energyRecords.filter(r=>r.date===date && r.kind==='meter');
+  assert.equal(records.length,1);assert.equal(records[0].values.generatorHours,403.7);assert.equal(records[0].values.generatorStarts,605);
+
   await click('data-page','KPI');
   assert.match(app.innerHTML, /class="priority-donut" style="background:conic-gradient\(/, 'KPI renders the priority circle');
   assert.match(app.innerHTML, new RegExp(`class="priority-donut-center"><strong>${openCount}</strong>`), 'open circle includes new and preventive interventions');
