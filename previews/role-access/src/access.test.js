@@ -53,3 +53,5 @@ test('department zones scope equipment, prevention, work and KPIs without changi
  db.role='Production Responsible';assert.throws(()=>applyCommand(db,{type:'new-request',values:{equipmentId:'EQ-150'}}),/permitted zones/);
  assert.equal(canSeePage('Purchasing Department','Inventory'),false);assert.equal(canSeePage('Employee','Overview'),false);
 });
+
+test('every role can open the equipment register',()=>{for(const role of ['Employee','Production Responsible','HSE','Purchasing Department','Maintenance Engineer','Maintenance Responsible','Viewer'])assert.equal(canSeePage(role,'Equipment'),true);});

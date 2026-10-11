@@ -5,7 +5,7 @@ export const rolePages={
   'Maintenance Engineer':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile'],
   'Maintenance Responsible':['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile'],
   HSE:['Overview','KPI','Equipment','Requests','Preventive','Energy','Notifications','Profile'],
-  'Purchasing Department':['Parts','Notifications','Profile'],
+  'Purchasing Department':['Equipment','Parts','Notifications','Profile'],
   Viewer:['Overview','KPI','Equipment','Requests','Preventive','Parts','Reports','Inventory','Energy','Notifications','Profile']
 };
 export const canSeePage=(role,page)=>(rolePages[role] || []).includes(page);

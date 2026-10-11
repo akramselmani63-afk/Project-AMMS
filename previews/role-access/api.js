@@ -9,9 +9,7 @@ import { applyCommand, recordIds, assignCreated } from './src/commands.js';
 
 const scrypt=promisify(scryptCallback);
 const dataDir=resolve(process.env.AMMS_ACCESS_DATA_DIR || join(homedir(),'Documents','AMMS-Access-Server'));
-const domain=String(process.env.AMMS_ACCESS_EMAIL_DOMAIN || '').trim().toLowerCase().replace(/^@/,'');
 const adminToken=String(process.env.AMMS_ACCESS_ADMIN_TOKEN || '');
-if (!domain) throw new Error('Set AMMS_ACCESS_EMAIL_DOMAIN before starting server mode.');
 const sessions=new Map();
 const failed=new Map();
 const failedAdmin=new Map();
@@ -35,7 +33,7 @@ async function body(req) {
 const email=value=>String(value || '').trim().toLowerCase();
 const personName=person=>[person?.name,person?.surname].filter(Boolean).join(' ') || person?.name || '';
 const activeRole=role=>role==='Developer Admin'?'Viewer':role;
-const validEmail=value=>value.endsWith(`@${domain}`) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const cookie=req=>String(req.headers.cookie || '').split(';').map(x=>x.trim()).find(x=>x.startsWith('amms_access_session='))?.slice(20);
 function userFor(req,users) {
   const token=cookie(req),session=token && sessions.get(token);
@@ -103,7 +101,7 @@ export async function api(req,res) {
         return true;
       }
       const input=await body(req),address=email(input.email),name=String(input.name || '').trim(),surname=String(input.surname || '').trim(),job=String(input.job || '').trim(),role=activeRole(input.role),action=input.action==='reset'?'reset':'provision';
-      if(!validEmail(address) || !name || !surname || name.length>80 || surname.length>80 || job.length>100 || !roles.includes(role) || !['provision','reset'].includes(input.action)) {send(res,400,{error:'Enter a valid company email, name, surname, job and role.'});return true;}
+      if(!validEmail(address) || !name || !surname || name.length>80 || surname.length>80 || job.length>100 || !roles.includes(role) || !['provision','reset'].includes(input.action)) {send(res,400,{error:'Enter a valid email, name, surname, job and role.'});return true;}
       const activationCode=randomBytes(24).toString('hex');
       const result=await serial(async()=>{
         const latest=await read('users.json',{}),existing=latest[address];
