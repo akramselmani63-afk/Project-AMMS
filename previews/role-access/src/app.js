@@ -217,6 +217,7 @@ function reliabilityForm(id) {
   const hours=(name,title,value='')=>field(name,title,'number',value,false).replace('step="1"','step="0.01"');
   return `<p class="modal-context">${t('Use verified meter / SCADA operating hours and event counts for the same machine and period. Calendar hours are not operating hours. Saving the exact same period updates it; overlapping periods are refused.','Utilisez des heures de fonctionnement vérifiées (compteur / SCADA) et les nombres d’événements pour la même machine et période. Les heures calendaires ne sont pas les heures de fonctionnement. Une période identique est modifiée ; les chevauchements sont refusés.')}</p>${select('equipmentId',t('Machine / component','Machine / composant'),machines.map(e=>[e.id,path(e.id)]),equipmentId || kpiEquipment)}${field('startDate',t('Period start','Début de période'),'date',startDate || stats.from || flow.today())}${field('endDate',t('Period end','Fin de période'),'date',endDate || flow.today())}${hours('operatingHours',t('Actual operating hours','Heures réelles de fonctionnement'),entry?.operatingHours ?? '').replace('<input ','<input required ')}${field('failureCount',t('Failures in this period','Pannes dans cette période'),'number',entry?.failureCount ?? 0)}${field('maintenanceCount',t('All maintenance events (corrective + preventive)','Toutes les maintenances (correctives + préventives)'),'number',entry?.maintenanceCount ?? 0)}<details class="field full" ${entry?.failedUnitCount?'open':''}><summary>${t('MTTF: nonrepairable unit lifetimes (optional)','MTTF : durées de vie des unités non réparables (facultatif)')}</summary><p>${t('Enter the sum of full operating lifetimes of failed, replaced units such as lamps. This is an observed average; surviving units are not included. Do not enter repairable-machine uptime here.','Saisissez la somme des durées de vie complètes d’unités défaillantes remplacées, comme des lampes. C’est une moyenne observée ; les unités encore en service ne sont pas incluses. Ne saisissez pas ici le fonctionnement des machines réparables.')}</p><div class="form-grid">${hours('failedUnitHours',t('Total full lifetimes of failed units (hours)','Durées de vie totales des unités défaillantes (heures)'),entry?.failedUnitHours ?? '')}${field('failedUnitCount',t('Number of failed units','Nombre d’unités défaillantes'),'number',entry?.failedUnitCount ?? '',false)}</div></details>`;
 }
+function downtimeMinutes(hours) { return (hours*60).toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:2}); }
 function restrictedKpis(standalone=true) {
   const stats=maintenanceStats(db,{days:kpiDays});
   let values;
@@ -230,7 +231,7 @@ function restrictedKpis(standalone=true) {
     [t('Safety reviews pending','Validations HSE en attente'),db.requests.filter(r=>flow.canReviewRequest(db.role,r,db)).length],
     [t('Approved safety assessments','Évaluations HSE approuvées'),db.requests.filter(r=>r.hseApproval).length],
     [t('Completed interventions','Interventions terminées'),stats.completedCount ?? 0],
-    [t('Recorded downtime','Arrêt enregistré'),`${stats.downtimeHours} h`],
+    [t('Recorded downtime','Arrêt enregistré'),`${downtimeMinutes(stats.downtimeHours)} ${t('min','min')}`],
     [t('Overdue preventive plans','Plans préventifs en retard'),stats.overduePM]
   ];
   else values=[
@@ -266,10 +267,8 @@ function view() {
     const work=db.workOrders.filter(w=>!['Closed','Legacy completed'].includes(w.status) && match(w)).sort((a,b)=>(a.priority || 'P4').localeCompare(b.priority || 'P4') || (a.dueDate || '').localeCompare(b.dueDate || ''));
     const parts=db.partRequests.filter(p=>!['Closed','Rejected'].includes(p.status) && match(p));
     const end=new Date(); end.setDate(end.getDate()+7); const through=flow.localDay(end.toISOString());
-    const since=new Date(); since.setDate(since.getDate()-30); const last30=since.toISOString();
     const due=db.preventive.filter(p=>p.nextDue<=through && match(p)).sort((a,b)=>a.nextDue.localeCompare(b.nextDue));
-    const completed=db.workOrders.filter(w=>w.completedAt && w.completedAt>=last30);
-    const downtime=completed.reduce((sum,w)=>sum+(Number(w.downtimeMinutes)||0),0);
+    const downtime=downtimeMinutes(maintenanceStats(db,{days:30}).downtimeHours);
     const approvals=db.partRequests.filter(p=>['Responsible review','Order approval'].includes(p.status)).length+work.filter(w=>['Awaiting risk assessment','Awaiting approval'].includes(w.status)).length+db.requests.filter(r=>['Approval review','Responsible review','HSE review'].includes(r.status)).length;
     const activeInterventions=interventions().filter(r=>match(r) && !['Closed','Legacy completed','Rejected'].includes(r.status));
     const metrics=[[activeInterventions.length,t('Open interventions','Interventions ouvertes'),`${activeInterventions.filter(r=>r.priority==='P1').length} P1 · ${activeInterventions.filter(r=>r.priority==='P2').length} P2`],[approvals,t('Awaiting approval','En attente de validation'),t('Safety or responsible review','HSE ou responsable')],[due.length,t('Preventive due soon','Préventif à échéance'),t('Within 7 days','Sous 7 jours')],[downtime,t('Downtime · 30 days','Arrêt · 30 jours'),t('minutes','minutes')]];
