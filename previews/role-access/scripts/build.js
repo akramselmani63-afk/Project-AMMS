@@ -9,8 +9,9 @@ await mkdir(dist,{recursive:true});
 await cp(resolve(root,'index.html'),resolve(dist,'index.html'));
 await cp(resolve(root,'account-admin.html'),resolve(dist,'account-admin.html'));
 await cp(resolve(root,'styles.css'),resolve(dist,'styles.css'));
-for (const file of ['manifest.webmanifest','service-worker.js']) await cp(resolve(root,file),resolve(dist,file));
+for (const file of ['manifest.webmanifest','service-worker.js','downloads.html','downloads.css']) await cp(resolve(root,file),resolve(dist,file));
 await mkdir(resolve(dist,'src'));
 for (const file of ['access.js','app.js','account-admin.js','commands.js','data.js','workflow.js','statistics.js','storage.js','photos.js','source-assets.js']) await cp(resolve(root,'src',file),resolve(dist,'src',file));
 await cp(resolve(root,'assets'),resolve(dist,'assets'),{recursive:true});
 console.log('Built static app in dist/');
+
