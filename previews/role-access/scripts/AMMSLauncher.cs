@@ -21,7 +21,7 @@ internal static class AMMSLauncher
 
             string edge = FindEdge();
             if (edge == null)
-                throw new InvalidOperationException("Microsoft Edge is required to run AMMS. Install Edge, then open AMMS-Access-Preview.exe again.");
+                throw new InvalidOperationException("Microsoft Edge is required to run agriFIX. Install Edge, then open agriFIX.exe again.");
 
             string profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AMMS-Access-Preview");
             string previousProfile = Path.Combine(appDir, "browser-profile");
@@ -32,7 +32,7 @@ internal static class AMMSLauncher
         }
         catch (Exception ex)
         {
-            MessageBox.Show("AMMS could not start.\r\n\r\n" + ex.Message, "AMMS-Access-Preview", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("agriFIX could not start.\r\n\r\n" + ex.Message, "agriFIX", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

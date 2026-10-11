@@ -1,4 +1,4 @@
-const CACHE = 'amms-access-preview-shell-v3';
+const CACHE = 'agrifix-shell-v4';
 const FILES = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './src/app.js', './src/commands.js', './src/data.js', './src/workflow.js', './src/storage.js', './src/photos.js', './src/source-assets.js',

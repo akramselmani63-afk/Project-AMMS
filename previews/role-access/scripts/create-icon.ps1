@@ -4,10 +4,11 @@ $project = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $project 'assets\amms-app-icon-green-a.png'
 $icon = Join-Path $project 'assets\amms-app-icon.ico'
 $sizes = @(256, 128, 64, 48, 32, 16)
-$cropEdge = 55
-$cropSize = 1144
+$cropEdge = 0
+$cropSize = 0
 $images = @()
     $original = [System.Drawing.Image]::FromFile($source)
+    $cropSize = $original.Width
     foreach ($size in $sizes) {
         $bitmap = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -27,7 +28,7 @@ $images = @()
         $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
         $destination = New-Object System.Drawing.Rectangle(0, 0, $size, $size)
         $graphics.DrawImage($original, $destination, $cropEdge, $cropEdge, $cropSize, $cropSize, [System.Drawing.GraphicsUnit]::Pixel)
-        $bitmap.Save((Join-Path $project "assets\amms-access-preview-pwa-$size.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Save((Join-Path $project "assets\amms-pwa-$size.png"), [System.Drawing.Imaging.ImageFormat]::Png)
         $graphics.Dispose(); $bitmap.Dispose()
     }
     $original.Dispose()
