@@ -27,7 +27,7 @@ internal static class AMMSLauncher
             string previousProfile = Path.Combine(appDir, "browser-profile");
             if (!Directory.Exists(profile) && Directory.Exists(previousProfile)) CopyDirectory(previousProfile, profile);
             Directory.CreateDirectory(profile);
-            string url = new Uri(htmlPath).AbsoluteUri;
+            string url = "http://127.0.0.1:4274/";
             Process.Start(new ProcessStartInfo(edge, "--app=" + Quote(url) + " --user-data-dir=" + Quote(profile) + " --start-maximized --no-first-run --no-default-browser-check") { UseShellExecute = false });
         }
         catch (Exception ex)
