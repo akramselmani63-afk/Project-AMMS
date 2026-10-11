@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
-const serverMode=process.env.AMMS_ACCESS_MODE==='server';
+const serverMode=true;
 const root = resolve(process.argv[2] || (serverMode?'dist':'.'));
 const port = Number(process.env.AMMS_ACCESS_PORT || 4273);
 const host = process.env.HOST || '127.0.0.1';

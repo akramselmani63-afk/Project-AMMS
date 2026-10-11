@@ -1,4 +1,4 @@
-const CACHE = 'agrimaint-shell-v5';
+const CACHE = 'agrimaint-shell-v6';
 const FILES = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './src/app.js', './src/commands.js', './src/data.js', './src/workflow.js', './src/storage.js', './src/photos.js', './src/source-assets.js',

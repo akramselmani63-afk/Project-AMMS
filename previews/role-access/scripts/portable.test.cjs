@@ -5,13 +5,43 @@ const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const vm = require('node:vm');
 
+test('server sign-in cannot be bypassed by a saved local session or unavailable server',async()=>{
+  execFileSync(process.execPath,['scripts/portable.js']);
+  const html=readFileSync('AMMS-Access-Preview.html','utf8');
+  const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  for(const unavailable of [false,true]){
+    const message={textContent:''}, element={textContent:'',remove(){},closest(){return this;}};
+    const app={innerHTML:'',removeAttribute(){},querySelector:s=>s==='#auth-message'?message:element};
+    const listeners={};
+    const context=vm.createContext({
+      document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(name,fn)=>listeners[name]=fn},
+      location:{protocol:'file:'},navigator:{onLine:true},performance:{now:()=>0},setTimeout(){},
+      localStorage:{getItem:key=>key.includes('mode')?'local':null},sessionStorage:{getItem:()=> '1'},
+      fetch:async()=>{if(unavailable)throw new TypeError('Offline');return {ok:false,status:401,json:async()=>({error:'Sign in required.'})};},
+      structuredClone,console:{warn(){}}
+    });
+    vm.runInContext(script,context);await new Promise(resolve=>setImmediate(resolve));
+    assert.match(app.innerHTML,/id="account-form"/);
+    assert.doesNotMatch(app.innerHTML,/signin-form|switch-mode|demo-access|class="shell/);
+    await listeners.submit({target:{id:'signin-form'},preventDefault(){}});
+    assert.doesNotMatch(app.innerHTML,/class="shell/);
+    if(unavailable)assert.match(message.textContent,/serveur est indisponible/);
+  }
+});
+
+function serverCacheDatabase() {
+  const values=new Map();
+  return {open(){const request={};queueMicrotask(()=>{request.result={close(){},transaction(){const tx={objectStore(){return {get(key){const r={};queueMicrotask(()=>{r.result=values.get(key);r.onsuccess?.();});return r;},put(value,key){values.set(key,structuredClone(value));queueMicrotask(()=>tx.oncomplete?.());}};}};return tx;}};request.onsuccess?.();});return request;}};
+}
+
+
 test('portable file opens records from every list', async () => {
   const root = resolve(__dirname, '..');
   execFileSync(process.execPath, ['scripts/portable.js'], { cwd: root });
   const html = readFileSync(resolve(root, 'AMMS-Access-Preview.html'), 'utf8');
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   const listeners = {};
-  const app = { innerHTML: '', removeAttribute() {} };
+  const app = { innerHTML: '', removeAttribute() {}, querySelectorAll:()=>[] };
   const printArea={innerHTML:'',classList:{add(){},remove(){}},querySelector:()=>({focus(){}})};
   const document = {
     documentElement: {}, body: { classList: { toggle() {} } },
@@ -19,26 +49,29 @@ test('portable file opens records from every list', async () => {
     addEventListener: (name, handler) => { listeners[name] = handler; }
   };
   let saved;
+  const {applyCommand}=await import('../src/commands.js');
   const context = vm.createContext({
     document, AMMSNotifications:{notify(){}}, performance: { now: () => 0 }, setTimeout() {},
-    sessionStorage: { getItem: () => '1' },
-    localStorage: { getItem: () => saved, setItem: (key,value) => {saved=value;} },
-    indexedDB: { open() { throw Error('Unavailable in this test'); } },
+    navigator:{onLine:true},crypto:require('node:crypto').webcrypto,
+    fetch:async (url,options)=>{const workspace=JSON.parse(saved);if(url==='/api/command'){applyCommand(workspace,JSON.parse(options.body));saved=JSON.stringify(workspace);}return {ok:true,json:async()=>({workspace,user:{email:'engineer@example.test',job:'Maintenance engineer'}})};},
+    localStorage: { getItem: () => 'fr', setItem: (key,value) => {saved=value;} },
+    indexedDB:serverCacheDatabase(),
     console: { warn() {} }, structuredClone
   });
-  vm.runInContext(script, context);
   vm.runInContext(readFileSync(resolve(root,'src/app.js'),'utf8').match(/function utilityColor\(spec,value\) \{[\s\S]*?\n\}/)[0],context);
   assert.equal(vm.runInContext('utilityColor({min:6,max:8},6)',context),'utility-low');
   assert.equal(vm.runInContext('utilityColor({min:6,max:8},8)',context),'utility-high');
   assert.equal(vm.runInContext('utilityColor({min:6,max:8},7)',context),'utility-normal');
   assert.equal(vm.runInContext('utilityColor({min:6,max:8},null)',context),'');
-  const workspace = vm.runInContext('workflow.seed({examples:true})', context);
+  const {seed,generatePM}=await import('../src/workflow.js');
+  const workspace = seed({examples:true});
   workspace.actor = 'Akram Selmani';
   context.workspace = workspace;
-  vm.runInContext('workflow.generatePM(workspace, workspace.preventive[0].id)', context);
+  generatePM(workspace,workspace.preventive[0].id);
   workspace.partRequests.push({ id: 'SP-TEST', title: 'Test part', equipmentId: workspace.equipment[0].id, status: 'Purchasing', reference: 'REF-1', quantity: 1, unit: 'pcs', acceptedQuantity: 0, rejectedQuantity: 0, deliveries: [], photos: [] });
   workspace.partRequests.push({...workspace.partRequests[0],id:'SP-SECOND',title:'Second part'});
   saved = JSON.stringify(workspace);
+  vm.runInContext(script, context);
   await new Promise(resolve => setImmediate(resolve));
   const orphanWork = workspace.workOrders.filter(w => !workspace.requests.some(r => r.id === w.requestId));
   const openCount = workspace.requests.filter(r => !['Closed','Legacy completed','Rejected'].includes(workspace.workOrders.find(w => w.requestId === r.id)?.status || r.status)).length + orphanWork.filter(w => !['Closed','Legacy completed','Rejected'].includes(w.status)).length;
@@ -167,8 +200,8 @@ test('access preview hides restricted routes, direct records and private KPI fie
  const {seed}=await import('../src/workflow.js');const html=readFileSync('AMMS-Access-Preview.html','utf8');const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
  for(const role of ['Employee','Production Responsible','HSE','Purchasing Department','Maintenance Responsible','Viewer']){
   const workspace=seed({examples:true});workspace.role=role;workspace.actor='Alice';workspace.requests[0].reportedBy='Alice';
-  const app={innerHTML:'',removeAttribute(){}};const listeners={};const saved=JSON.stringify(workspace);
-  const context=vm.createContext({document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},sessionStorage:{getItem:()=> '1'},localStorage:{getItem:()=>saved},indexedDB:{open(){throw Error('Unavailable')}},console:{warn(){}},structuredClone});
+  const app={innerHTML:'',removeAttribute(){},querySelectorAll:()=>[]};const listeners={};const saved=JSON.stringify(workspace);
+  const context=vm.createContext({document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},navigator:{onLine:true},fetch:async()=>({ok:true,json:async()=>({workspace,user:{email:'alice@example.test',job:'Operator'}})}),localStorage:{getItem:()=> 'fr'},indexedDB:serverCacheDatabase(),console:{warn(){}},structuredClone});
   vm.runInContext(script,context);await new Promise(r=>setImmediate(r));assert.doesNotMatch(app.innerHTML,/ACCESS PREVIEW|APERÇU DES ACCÈS/);if(!['Employee','Purchasing Department'].includes(role))assert.match(app.innerHTML,/overview-screen/);
   const click=(page)=>listeners.click({target:{closest:s=>s==='[data-page]'?{dataset:{page}}:null}});
   await click('KPI');if(!['Employee','Purchasing Department'].includes(role)) assert.match(app.innerHTML,/KPI/);
