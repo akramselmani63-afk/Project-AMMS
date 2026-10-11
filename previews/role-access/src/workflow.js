@@ -377,6 +377,10 @@ export function notificationFeed(db) {
     if(collection==='partRequests' && db.role==='Purchasing Department' && ['Purchasing','Ordered','Partial acceptance'].includes(r.status)) action='Purchasing action required';
     if(action) feed.push({id:r.id,title:r.title || r.id,equipmentId:r.equipmentId,collection,status:'Pending',action,at:r.createdAt || '',actor:'',role:''});
   }
+  if(maintenanceRole || ['Production Responsible','HSE'].includes(db.role)) {
+    const day=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}),through=new Date(Date.parse(day+'T00:00:00Z')+7*86400000).toISOString().slice(0,10);
+    for(const plan of db.preventive || []) if(plan.nextDue && plan.nextDue<=through) feed.push({id:plan.id,title:plan.title+' · '+plan.nextDue,equipmentId:plan.equipmentId,collection:'preventive',status:'Pending',action:'Preventive maintenance due',at:plan.nextDue+'T00:00:00+01:00',actor:'',role:''});
+  }
   if(maintenanceRole) for(const item of db.inventory || []) {
     const low=stockBalance(item)<=item.minimum,lastLow=(item.history || []).findLast(h=>h.action==='Low stock detected');
     for(const h of item.history || []) if(['Low stock detected','Stock replenished'].includes(h.action) && !(low && h===lastLow)) feed.push({...h,id:item.id,title:item.name+' · '+item.reference+' · '+h.note,collection:'inventory',action:h.action==='Low stock detected'?'Low stock':h.action,status:h.action==='Low stock detected'?'Resolved':'History'});

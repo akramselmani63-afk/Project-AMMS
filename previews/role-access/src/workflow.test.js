@@ -370,3 +370,10 @@ test('stock threshold events persist after replenishment without repeated low ev
  f.moveStock(db,item.id,{type:'in',quantity:3});let feed=f.notificationFeed(db);assert.equal(feed.filter(n=>n.action==='Low stock' && n.status==='Pending').length,0);assert.equal(feed.filter(n=>n.action==='Low stock' && n.status==='Resolved').length,1);assert.equal(feed.find(n=>n.status==='Resolved').at,item.history.find(h=>h.action==='Low stock detected').at);const restored=feed.find(n=>n.action==='Stock replenished');assert.equal(restored.actor,'Akram');assert.match(restored.title,/1 → 4/);
  f.moveStock(db,item.id,{type:'out',quantity:3});assert.equal(item.history.filter(h=>h.action==='Low stock detected').length,2);
 });
+
+test('preventive reminder starts seven days ahead and remains until the due date advances',()=>{
+ const db=f.seed();db.role='Maintenance Engineer';const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Africa/Algiers'}),date=n=>new Date(Date.parse(today+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
+ db.preventive=[{id:'P1',title:'Task',nextDue:date(8)}];const reminders=()=>f.notificationFeed(db).filter(n=>n.collection==='preventive');assert.equal(reminders().length,0);
+ for(const days of [7,0,-2]){db.preventive[0].nextDue=date(days);assert.equal(reminders().length,1);}
+ db.preventive[0].nextDue=date(30);assert.equal(reminders().length,0);db.role='Employee';db.preventive[0].nextDue=today;assert.equal(reminders().length,0);
+});
