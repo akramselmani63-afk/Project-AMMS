@@ -18,4 +18,4 @@ createServer(async (req,res) => {
     const body = await readFile(target);
     res.writeHead(200, { 'content-type': types[extname(target)] || 'application/octet-stream', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(body);
   } catch { res.writeHead(404); res.end('Not found'); }
-}).listen(port,host,()=>console.log(`agriFIX running at http://${host}:${port}${serverMode?' (server mode)':''}`));
+}).listen(port,host,()=>console.log(`agriMAINT running at http://${host}:${port}${serverMode?' (server mode)':''}`));

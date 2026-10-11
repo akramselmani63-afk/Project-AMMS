@@ -97,7 +97,7 @@ function translate(value) {
 
 export function localize(root, language) {
   document.documentElement.lang = language;
-  document.title = language === 'fr' ? 'agriFIX · Gestion de maintenance AGRIDIAM' : 'agriFIX · AGRIDIAM Maintenance Management System';
+  document.title = language === 'fr' ? 'agriMAINT · Gestion de maintenance AGRIDIAM' : 'agriMAINT · AGRIDIAM Maintenance Management System';
   if (language !== 'fr') return;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];

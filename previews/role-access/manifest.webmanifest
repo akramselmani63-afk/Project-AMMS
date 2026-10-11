@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "agriFIX · AGRIDIAM Maintenance",
-  "short_name": "agriFIX",
+  "name": "agriMAINT · AGRIDIAM Maintenance",
+  "short_name": "agriMAINT",
   "description": "AGRIDIAM Maintenance Management System",
   "lang": "fr",
   "start_url": "./",
