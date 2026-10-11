@@ -15,7 +15,7 @@ internal static class AMMSLauncher
             string appDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AGRIDIAM", "AMMS-Access-Preview");
             Directory.CreateDirectory(appDir);
             string htmlPath = Path.Combine(appDir, "AMMS-Prototype.html");
-            using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("AMMS-Prototype.html"))
+            using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("AMMS-Access-Preview.html"))
             using (FileStream output = File.Create(htmlPath))
                 resource.CopyTo(output);
 

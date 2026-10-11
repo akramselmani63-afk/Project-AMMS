@@ -2,8 +2,9 @@ name: Build Android APK
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/maintenance-workflows]
     paths:
+      - "previews/role-access/**"
       - "android/**"
       - "scripts/portable.js"
       - "scripts/build-notifications.js"
@@ -38,14 +39,14 @@ jobs:
         with:
           gradle-version: "8.9"
       - name: Install application dependencies
-        run: npm ci
+        run: npm --prefix previews/role-access ci
       - name: Verify maintenance workflows and portable page
-        run: npm test
+        run: npm --prefix previews/role-access test
       - name: Build the offline AMMS page
         run: |
-          npm run portable
+          npm --prefix previews/role-access run portable
           mkdir -p android/app/src/main/assets/www
-          cp AMMS-Prototype.html android/app/src/main/assets/www/index.html
+          cp previews/role-access/AMMS-Access-Preview.html android/app/src/main/assets/www/index.html
       - name: Prepare branded Android launcher icon
         run: |
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
@@ -54,7 +55,29 @@ jobs:
         run: gradle --no-daemon -p android assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: AMMS-Android-APK
+          name: AMMS-Current-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: previews/role-access
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+      - name: Build Windows executable
+        shell: powershell
+        run: ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AMMS-Current-Windows-EXE
+          path: previews/role-access/dist/AMMS-Access-Preview.exe
           if-no-files-found: error
           retention-days: 30
