@@ -190,7 +190,7 @@ function render() {
 function kpiView() {
   if(['Employee','Purchasing Department'].includes(db.role)) return restrictedKpis();
   const stats=maintenanceStats(db,{days:kpiDays,equipmentId:kpiEquipment});
-  const value=(number,unit='')=>number===null?'—':`${number.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:1})}${unit}`;
+  const value=(number,unit='')=>number===null?'—':unit===' h' && number>0 && number<1?`${downtimeMinutes(number)} min`:`${number.toLocaleString(db.language==='fr'?'fr-DZ':'en-GB',{maximumFractionDigits:unit===' h'?2:1})}${unit}`;
   const noData=t('Not enough data','Données insuffisantes');
   const reliability=[
     ['MTTR',t('Mean time to repair · estimate','Temps moyen de réparation · estimation'),stats.mttr,
