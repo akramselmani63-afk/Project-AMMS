@@ -28,7 +28,11 @@ const energyDrafts=new Map();
 const selectedParts=new Set();
 let kpiDays=30, kpiEquipment='';
 async function serverRequest(path,method='GET',data) {
-  const response=await fetch(`/api/${path}`,{method,credentials:'same-origin',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,cache:'no-store'});
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),10000);
+  let response;
+  try { response=await fetch(`/api/${path}`,{method,credentials:'same-origin',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined,cache:'no-store',signal:controller.signal}); }
+  finally { clearTimeout(timeout); }
   const result=await response.json();
   if(!response.ok) { const error=new Error(result.error || 'Server request failed.'); error.status=response.status; throw error; }
   return result;

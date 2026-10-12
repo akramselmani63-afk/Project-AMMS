@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -28,12 +29,31 @@ internal static class AMMSLauncher
             if (!Directory.Exists(profile) && Directory.Exists(previousProfile)) CopyDirectory(previousProfile, profile);
             Directory.CreateDirectory(profile);
             string url = "http://127.0.0.1:4274/";
+            while (!ServerReady(url))
+            {
+                if (MessageBox.Show("The agriMAINT server is unavailable. Start the server on this PC, then choose Retry.\r\n\r\nLe serveur agriMAINT est indisponible. Démarrez le serveur sur ce PC, puis cliquez sur Réessayer.", "agriMAINT", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return;
+            }
             Process.Start(new ProcessStartInfo(edge, "--app=" + Quote(url) + " --user-data-dir=" + Quote(profile) + " --start-maximized --no-first-run --no-default-browser-check") { UseShellExecute = false });
         }
         catch (Exception ex)
         {
             MessageBox.Show("agriMAINT could not start.\r\n\r\n" + ex.Message, "agriMAINT", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private static bool ServerReady(string url)
+    {
+        try
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url + "api/status");
+            request.Timeout = 5000;
+            request.ReadWriteTimeout = 5000;
+            request.Proxy = null;
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+                return response.StatusCode == HttpStatusCode.OK && reader.ReadToEnd().Contains("\"mode\":\"server\"");
+        }
+        catch (WebException) { return false; }
     }
 
     private static string FindEdge()

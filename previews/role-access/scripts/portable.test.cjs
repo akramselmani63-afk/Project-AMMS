@@ -13,7 +13,7 @@ test('server sign-in cannot be bypassed by a saved local session or unavailable 
     const message={textContent:''}, element={textContent:'',remove(){},closest(){return this;}};
     const app={innerHTML:'',removeAttribute(){},querySelector:s=>s==='#auth-message'?message:element};
     const listeners={};
-    const context=vm.createContext({
+    const context=vm.createContext({AbortController,clearTimeout,
       document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(name,fn)=>listeners[name]=fn},
       location:{protocol:'file:'},navigator:{onLine:true},performance:{now:()=>0},setTimeout(){},
       localStorage:{getItem:key=>key.includes('mode')?'local':null},sessionStorage:{getItem:()=> '1'},
@@ -50,7 +50,7 @@ test('portable file opens records from every list', async () => {
   };
   let saved;
   const {applyCommand}=await import('../src/commands.js');
-  const context = vm.createContext({
+  const context = vm.createContext({AbortController,clearTimeout,
     document, AMMSNotifications:{notify(){}}, performance: { now: () => 0 }, setTimeout() {},
     navigator:{onLine:true},crypto:require('node:crypto').webcrypto,
     fetch:async (url,options)=>{const workspace=JSON.parse(saved);if(url==='/api/command'){applyCommand(workspace,JSON.parse(options.body));saved=JSON.stringify(workspace);}return {ok:true,json:async()=>({workspace,user:{email:'engineer@example.test',job:'Maintenance engineer'}})};},
@@ -201,7 +201,7 @@ test('access preview hides restricted routes, direct records and private KPI fie
  for(const role of ['Employee','Production Responsible','HSE','Purchasing Department','Maintenance Responsible','Viewer']){
   const workspace=seed({examples:true});workspace.role=role;workspace.actor='Alice';workspace.requests[0].reportedBy='Alice';
   const app={innerHTML:'',removeAttribute(){},querySelectorAll:()=>[]};const listeners={};const saved=JSON.stringify(workspace);
-  const context=vm.createContext({document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},navigator:{onLine:true},fetch:async()=>({ok:true,json:async()=>({workspace,user:{email:'alice@example.test',job:'Operator'}})}),localStorage:{getItem:()=> 'fr'},indexedDB:serverCacheDatabase(),console:{warn(){}},structuredClone});
+  const context=vm.createContext({AbortController,clearTimeout,document:{documentElement:{},body:{classList:{toggle(){}}},querySelector:s=>s==='#app'?app:null,addEventListener:(n,h)=>listeners[n]=h},performance:{now:()=>0},setTimeout(){},navigator:{onLine:true},fetch:async()=>({ok:true,json:async()=>({workspace,user:{email:'alice@example.test',job:'Operator'}})}),localStorage:{getItem:()=> 'fr'},indexedDB:serverCacheDatabase(),console:{warn(){}},structuredClone});
   vm.runInContext(script,context);await new Promise(r=>setImmediate(r));assert.doesNotMatch(app.innerHTML,/ACCESS PREVIEW|APERÇU DES ACCÈS/);if(!['Employee','Purchasing Department'].includes(role))assert.match(app.innerHTML,/overview-screen/);
   const click=(page)=>listeners.click({target:{closest:s=>s==='[data-page]'?{dataset:{page}}:null}});
   await click('KPI');if(!['Employee','Purchasing Department'].includes(role)) assert.match(app.innerHTML,/KPI/);
@@ -210,3 +210,4 @@ test('access preview hides restricted routes, direct records and private KPI fie
   if(role==='Purchasing Department') assert.doesNotMatch(app.innerHTML,/data-page="KPI"|data-page="Inventory"/);
  }
 });
+
