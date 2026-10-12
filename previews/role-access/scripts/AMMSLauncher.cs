@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -35,12 +36,22 @@ internal static class AMMSLauncher
 #endif
             Directory.CreateDirectory(profile);
             string url = "http://127.0.0.1:4274/";
+#if ADMIN
             while (!ServerReady(url))
             {
                 if (MessageBox.Show("The agriMAINT server is unavailable. Start the server on this PC, then choose Retry.\r\n\r\nLe serveur agriMAINT est indisponible. Démarrez le serveur sur ce PC, puis cliquez sur Réessayer.", "agriMAINT", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return;
             }
-#if ADMIN
             url += "account-admin.html";
+#else
+            if (!ServerReady(url))
+            {
+                string portable = File.ReadAllText(htmlPath);
+                Match logo = Regex.Match(portable, "<img[^>]*class=\"splash-logo\"[^>]*src=\"([^\"]+)\"|<img[^>]*src=\"([^\"]+)\"[^>]*class=\"splash-logo\"");
+                string image = logo.Groups[1].Success ? logo.Groups[1].Value : logo.Groups[2].Value;
+                string offline = Path.Combine(appDir, "connection-lost.html");
+                File.WriteAllText(offline, "<!doctype html><html><head><meta charset='utf-8'><title>agriMAINT</title><style>body{margin:0;background:#f3f6f7;font:20px Segoe UI;text-align:center;color:#173747;display:grid;place-items:center;height:100vh}img{width:min(75vw,650px)}button{padding:14px 24px;font:inherit}p{margin:28px}</style></head><body><main><img alt='agriMAINT' src='" + image + "'><p id='message'>Opening agriMAINT / Ouverture d’agriMAINT</p><button hidden id='retry' onclick=\"location.href='http://127.0.0.1:4274/'\">Retry / Réessayer</button></main><script>setTimeout(function(){document.getElementById('message').textContent='Connection lost / Connexion perdue';document.getElementById('retry').hidden=false;alert('Connection lost / Connexion perdue');},5000);</script></body></html>");
+                url = new Uri(offline).AbsoluteUri;
+            }
 #endif
             Process.Start(new ProcessStartInfo(edge, "--app=" + Quote(url) + " --user-data-dir=" + Quote(profile) + " --start-maximized --no-first-run --no-default-browser-check") { UseShellExecute = false });
         }

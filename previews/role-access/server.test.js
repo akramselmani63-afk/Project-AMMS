@@ -60,7 +60,7 @@ test('company server shares records and enforces account roles',async()=>{
     assert.equal((await request('/api/login','POST',{email:'planner@other.test',password:'a newer planner password'})).status,200);
     for(const email of ['employee@example.test','hse@example.test','viewer@example.test']) assert.equal((await request('/api/signup','POST',{email,password:'a strong test password',invite})).status,201);
     const remembered=await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password',remember:true});
-    assert.match(remembered.cookieHeader,/Max-Age=2592000/);
+    assert.doesNotMatch(remembered.cookieHeader,/Max-Age/);
     const temporary=await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password'});
     assert.doesNotMatch(temporary.cookieHeader,/Max-Age/);
     const employee=(await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password'})).cookie;

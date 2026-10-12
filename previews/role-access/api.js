@@ -127,9 +127,9 @@ export async function api(req,res) {
         send(res,401,{error:'Invalid email or password.'});return true;
       }
       failed.delete(address);
-      const duration=input.remember===true || input.remember==='on'?30*24*60*60:8*60*60;
+      const duration=8*60*60;
       const token=randomBytes(32).toString('hex');sessions.set(token,{email:address,expires:Date.now()+duration*1000});
-      send(res,200,{user:{name:personName(account),job:account.job || '',role:activeRole(account.role),email:address}},{'set-cookie':`amms_access_session=${token}; HttpOnly; SameSite=Strict; Path=/api${input.remember===true || input.remember==='on'?`; Max-Age=${duration}`:''}${secureCookie}`});return true;
+      send(res,200,{user:{name:personName(account),job:account.job || '',role:activeRole(account.role),email:address}},{'set-cookie':`amms_access_session=${token}; HttpOnly; SameSite=Strict; Path=/api${secureCookie}`});return true;
     }
     const user=userFor(req,users);
     if(!user) {send(res,401,{error:'Sign in required.'});return true;}
