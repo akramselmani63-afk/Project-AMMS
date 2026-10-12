@@ -36,7 +36,7 @@ test('company server shares records and enforces account roles',async()=>{
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=async(path,method='GET',data,cookie='',adminKey='')=>{
     const response=await fetch(base+path,{method,headers:{...(data?{'content-type':'application/json',origin:base}:{}),...(cookie?{cookie}:{}),...(adminKey?{'x-amms-access-preview-admin-token':adminKey}:{})},body:data?JSON.stringify(data):undefined});
-    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0],cookieHeader:response.headers.get('set-cookie')};
   };
   try {
     assert.equal((await request('/api/signup','POST',{email:'employee@example.test',password:'a strong test password',invite:'wrong'})).status,400);
@@ -59,6 +59,10 @@ test('company server shares records and enforces account roles',async()=>{
     assert.equal((await request('/api/signup','POST',{email:'planner@other.test',password:'a third planner password',invite:reset.data.activationCode})).status,400);
     assert.equal((await request('/api/login','POST',{email:'planner@other.test',password:'a newer planner password'})).status,200);
     for(const email of ['employee@example.test','hse@example.test','viewer@example.test']) assert.equal((await request('/api/signup','POST',{email,password:'a strong test password',invite})).status,201);
+    const remembered=await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password',remember:true});
+    assert.match(remembered.cookieHeader,/Max-Age=2592000/);
+    const temporary=await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password'});
+    assert.doesNotMatch(temporary.cookieHeader,/Max-Age/);
     const employee=(await request('/api/login','POST',{email:'employee@example.test',password:'a strong test password'})).cookie;
     const hse=(await request('/api/login','POST',{email:'hse@example.test',password:'a strong test password'})).cookie;
     const viewerLogin=await request('/api/login','POST',{email:'viewer@example.test',password:'a strong test password'});
