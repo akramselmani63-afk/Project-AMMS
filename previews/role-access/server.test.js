@@ -1,3 +1,4 @@
+import {administratorKey} from './admin-key.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -41,17 +42,17 @@ test('company server shares records and enforces account roles',async()=>{
   try {
     assert.equal((await request('/api/signup','POST',{email:'employee@example.test',password:'a strong test password',invite:'wrong'})).status,400);
     assert.equal((await request('/api/admin/users')).status,401);
-    const listed=await request('/api/admin/users','GET',null,'','test-admin-secret');
+    const listed=await request('/api/admin/users','GET',null,'',administratorKey('test-admin-secret'));
     assert.equal(listed.status,200);
     assert.equal(listed.data.users.some(user=>'hash' in user || 'inviteHash' in user),false);
-    const provisioned=await request('/api/admin/users','POST',{action:'provision',name:'Test',surname:'Planner',job:'Maintenance Planner',email:'planner@other.test',role:'Maintenance Engineer'},'','test-admin-secret');
+    const provisioned=await request('/api/admin/users','POST',{action:'provision',name:'Test',surname:'Planner',job:'Maintenance Planner',email:'planner@other.test',role:'Maintenance Engineer'},'',administratorKey('test-admin-secret'));
     assert.equal(provisioned.status,200);
     assert.equal((await request('/api/signup','POST',{email:'planner@other.test',password:'a strong planner password',invite:provisioned.data.activationCode})).status,201);
     const plannerLogin=await request('/api/login','POST',{email:'planner@other.test',password:'a strong planner password'});
     assert.equal(plannerLogin.data.user.name,'Test Planner');
     const plannerSession=plannerLogin.cookie;
     assert.ok(plannerSession);
-    const reset=await request('/api/admin/users','POST',{action:'reset',name:'Test',surname:'Planner',job:'Maintenance Planner',email:'planner@other.test',role:'Maintenance Engineer'},'','test-admin-secret');
+    const reset=await request('/api/admin/users','POST',{action:'reset',name:'Test',surname:'Planner',job:'Maintenance Planner',email:'planner@other.test',role:'Maintenance Engineer'},'',administratorKey('test-admin-secret'));
     assert.equal(reset.status,200);
     assert.equal((await request('/api/workspace','GET',null,plannerSession)).status,401);
     assert.equal((await request('/api/login','POST',{email:'planner@other.test',password:'a strong planner password'})).status,401);

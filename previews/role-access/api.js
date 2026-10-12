@@ -3,6 +3,7 @@ import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import {administratorKey} from './admin-key.js';
 import { seed, migrate, roles } from './src/workflow.js';
 import {workspaceForRole} from './src/access.js';
 import { applyCommand, recordIds, assignCreated } from './src/commands.js';
@@ -64,7 +65,7 @@ function adminAuthorized(req) {
   const key=req.socket.remoteAddress || 'unknown',attempt=failedAdmin.get(key)||{count:0,until:0};
   if(attempt.until>Date.now()) return false;
   const given=Buffer.from(String(req.headers['x-amms-access-preview-admin-token'] || ''));
-  const expected=Buffer.from(adminToken);
+  const expected=Buffer.from(administratorKey(adminToken));
   const valid=given.length===expected.length && timingSafeEqual(given,expected);
   if(valid) { failedAdmin.delete(key); return true; }
   attempt.count++; attempt.until=attempt.count>=5?Date.now()+15*60_000:0; failedAdmin.set(key,attempt);

@@ -12,7 +12,7 @@ $env:AMMS_ACCESS_PORT = '4274'
 $env:HOST = '127.0.0.1'
 if (-not $env:AMMS_ACCESS_ADMIN_TOKEN) { throw 'Could not generate the account-administration key.' }
 Write-Host "Account administration: http://127.0.0.1:4274/account-admin.html"
-Write-Host "Administrator key (copy into that page): $env:AMMS_ACCESS_ADMIN_TOKEN" -ForegroundColor Yellow
+Write-Host 'The server displays a new administrator key every 5 minutes.' -ForegroundColor Yellow
 
 npm run build
 if ($LASTEXITCODE -ne 0) { throw 'AMMS build failed.' }
