@@ -6,7 +6,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Node.js is not installed or not available in P
 Write-Host "Using Node.js $nodeVersion"
 
 $env:AMMS_ACCESS_MODE = 'server'
-$env:AMMS_ACCESS_EMAIL_DOMAIN = 'example.com'
 $env:AMMS_ACCESS_DATA_DIR = Join-Path $env:USERPROFILE 'Documents\AMMS-Access-Test'
 $env:AMMS_ACCESS_ADMIN_TOKEN = (& node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))").Trim()
 $env:AMMS_ACCESS_PORT = '4274'
@@ -17,6 +16,7 @@ Write-Host "Administrator key (copy into that page): $env:AMMS_ACCESS_ADMIN_TOKE
 
 npm run build
 if ($LASTEXITCODE -ne 0) { throw 'AMMS build failed.' }
+& (Join-Path $PSScriptRoot 'package-admin.ps1')
 
 $server = Start-Process -FilePath 'node' -ArgumentList 'server.js' -WorkingDirectory (Get-Location).Path -PassThru -NoNewWindow
 try {
@@ -29,7 +29,7 @@ try {
         } catch { Start-Sleep -Milliseconds 500 }
     }
     if (-not $ready) { throw 'AMMS did not become ready on port 4274.' }
-    Start-Process 'http://127.0.0.1:4274/'
+    Start-Process -FilePath (Join-Path (Get-Location) 'dist\agriMAINT-Admin.exe')
     Write-Host 'AMMS test server is running. Close this window to stop it.'
     Wait-Process -Id $server.Id
 } finally {

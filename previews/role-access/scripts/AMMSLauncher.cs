@@ -13,26 +13,35 @@ internal static class AMMSLauncher
     {
         try
         {
+#if !ADMIN
             string appDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AGRIDIAM", "AMMS-Access-Preview");
             Directory.CreateDirectory(appDir);
             string htmlPath = Path.Combine(appDir, "AMMS-Prototype.html");
             using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("AMMS-Access-Preview.html"))
             using (FileStream output = File.Create(htmlPath))
                 resource.CopyTo(output);
+#endif
 
             string edge = FindEdge();
             if (edge == null)
                 throw new InvalidOperationException("Microsoft Edge is required to run agriMAINT. Install Edge, then open agriMAINT.exe again.");
 
+#if ADMIN
+            string profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AGRIDIAM", "agriMAINT-Admin");
+#else
             string profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AMMS-Access-Preview");
             string previousProfile = Path.Combine(appDir, "browser-profile");
             if (!Directory.Exists(profile) && Directory.Exists(previousProfile)) CopyDirectory(previousProfile, profile);
+#endif
             Directory.CreateDirectory(profile);
             string url = "http://127.0.0.1:4274/";
             while (!ServerReady(url))
             {
                 if (MessageBox.Show("The agriMAINT server is unavailable. Start the server on this PC, then choose Retry.\r\n\r\nLe serveur agriMAINT est indisponible. Démarrez le serveur sur ce PC, puis cliquez sur Réessayer.", "agriMAINT", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return;
             }
+#if ADMIN
+            url += "account-admin.html";
+#endif
             Process.Start(new ProcessStartInfo(edge, "--app=" + Quote(url) + " --user-data-dir=" + Quote(profile) + " --start-maximized --no-first-run --no-default-browser-check") { UseShellExecute = false });
         }
         catch (Exception ex)
