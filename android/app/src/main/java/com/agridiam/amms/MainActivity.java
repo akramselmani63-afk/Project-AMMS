@@ -36,7 +36,7 @@ public final class MainActivity extends Activity {
     private static final int PICK_PHOTOS = 100;
     private static final int SAVE_BACKUP = 101;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
-    private static final String START_URL = "https://" + ASSET_HOST + "/assets/www/index.html";
+    private static final String START_URL = "https://192.168.10.216:8443/";
 
     private final Handler mainThread = new Handler(Looper.getMainLooper());
     private WebView webView;
@@ -78,7 +78,7 @@ public final class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (ASSET_HOST.equals(uri.getHost()) && "https".equals(uri.getScheme()) && uri.getPath().startsWith("/assets/www/")) return false;
+                if ("192.168.10.216".equals(uri.getHost()) && uri.getPort() == 8443 && "https".equals(uri.getScheme())) return false;
                 if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -221,3 +221,4 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+

@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { maintenanceStats } from './statistics.js';
+import { recordReliability } from './workflow.js';
+
+test('KPI measurements validate exposure and periods and keep linked work separate from reliability counts',()=>{
+  const db={role:'Maintenance Engineer',actor:'Akram',equipment:[{id:'zone',kind:'Area'},{id:'machine',kind:'Machine',parentId:'zone'},{id:'other',kind:'Machine'}],requests:[{id:'ir',equipmentId:'machine',createdAt:'2026-09-15',status:'Approved'},{id:'new',equipmentId:'machine',createdAt:'2026-09-28',status:'Submitted'}],workOrders:[{id:'work',requestId:'ir',equipmentId:'machine',status:'Closed',startedAt:'2026-09-20T10:00:00+01:00',completedAt:'2026-09-20T12:00:00+01:00'},{id:'pm',equipmentId:'machine',type:'Preventive',status:'Closed',createdAt:'2026-09-12',startedAt:'2026-09-21T10:00:00+01:00',completedAt:'2026-09-21T11:00:00+01:00'},{id:'bad',equipmentId:'other',status:'Closed',startedAt:'bad',completedAt:'2026-09-15'},{id:'future',equipmentId:'machine',status:'Closed',completedAt:'2026-11-15'}],preventive:[{equipmentId:'machine',nextDue:'2026-09-20'}],partRequests:[{equipmentId:'machine',status:'Purchasing'},{equipmentId:'other',status:'Closed'}]};
+  const measurement={equipmentId:'machine',startDate:'2026-09-01',endDate:'2026-09-30',operatingHours:'240',failureCount:'2',maintenanceCount:'6',failedUnitHours:'300',failedUnitCount:'3'};
+  recordReliability(db,measurement);
+  let stats=maintenanceStats(db,{equipmentId:'zone',days:30,now:new Date('2026-09-30T12:00:00Z')});
+  assert.equal(stats.mttr,2); assert.equal(stats.repairSamples,1);
+  assert.equal(stats.downtimeHours,3); assert.equal(stats.completedCount,2);
+  assert.equal(stats.cohortCount,3); assert.equal(stats.completionRate,2/3*100);
+  assert.equal(stats.openCount,1); assert.equal(stats.overduePM,1); assert.equal(stats.outstandingParts,1);
+  assert.equal(stats.mtbf,120); assert.equal(stats.mtbm,40); assert.equal(stats.mttf,100);
+  assert.equal(stats.failureCount,2,'failures are measured, not inferred from app requests');
+  const short=maintenanceStats(db,{equipmentId:'zone',days:7,now:new Date('2026-09-30T12:00:00Z')});
+  assert.equal(short.mtbf,null); assert.equal(short.mttr,null); assert.equal(short.partialLogs,1);
+  assert.equal(maintenanceStats(db,{equipmentId:'other',days:30,now:new Date('2026-09-30T12:00:00Z')}).missingTimes,1);
+  assert.throws(()=>recordReliability(db,{...measurement,startDate:'2026-09-15'}),/overlap/);
+  assert.throws(()=>recordReliability(db,{...measurement,operatingHours:721}),/operating hours/);
+  assert.throws(()=>recordReliability(db,{...measurement,failureCount:1.5}),/whole/);
+  assert.throws(()=>recordReliability(db,{...measurement,endDate:'2099-01-01'}),/period/);
+  assert.throws(()=>recordReliability(db,{...measurement,startDate:'2026-02-30'}),/period/);
+  assert.throws(()=>recordReliability(db,{...measurement,failedUnitCount:0}),/both/);
+  recordReliability(db,{...measurement,failureCount:0,maintenanceCount:0,failedUnitCount:0,failedUnitHours:0});
+  assert.equal(db.equipment[1].reliabilityLog.length,1,'exact same interval is updated');
+  stats=maintenanceStats(db,{days:0,now:new Date('2026-09-30T12:00:00Z')});
+  assert.equal(stats.mtbf,null); assert.equal(stats.mtbm,null); assert.equal(stats.mttf,null);
+  db.equipment.push({id:'component',kind:'Component',parentId:'machine'});
+  recordReliability(db,{...measurement,equipmentId:'component',operatingHours:48,failureCount:1,maintenanceCount:1,failedUnitCount:0,failedUnitHours:0});
+  assert.equal(maintenanceStats(db,{equipmentId:'machine',days:0,now:new Date('2026-09-30T12:00:00Z')}).mtbf,null,'a machine uses its own measured exposure, not its component logs');
+  assert.equal(maintenanceStats(db,{equipmentId:'zone',days:0,now:new Date('2026-09-30T12:00:00Z')}).mtbf,288,'a zone pools asset exposure');
+  db.role='Viewer'; assert.throws(()=>recordReliability(db,measurement),/role/);
+});
