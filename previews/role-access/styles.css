@@ -699,3 +699,9 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
 .energy-matrix .utility-low,.energy-matrix .utility-low [data-energy-cell]{background:#fde4e2;color:#8d2420}.energy-matrix .utility-high,.energy-matrix .utility-high [data-energy-cell]{background:#fff1bd;color:#624b00}.energy-matrix .utility-normal,.energy-matrix .utility-normal [data-energy-cell]{background:#e2f2e7;color:#155d35}
 
 .prevention-panel .preventive-overdue,.pm-card.preventive-overdue{background:#fde4e2;color:#8d2420;border-color:#c74b43!important}.prevention-panel .preventive-overdue small,.pm-card.preventive-overdue p{color:#8d2420}.prevention-panel .preventive-overdue{border:1px solid #c74b43;border-radius:8px;padding:12px;margin-top:8px}
+@media(max-width:780px){
+  .top-actions .role-chip{min-width:44px;max-width:44px;min-height:44px;padding:6px;justify-content:center}
+  .top-actions .role-chip>span:last-child{display:none}
+  .top-actions .signout-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px;font-size:13px}
+}
+@media(max-width:540px){.topbar .search{display:none}.top-actions{gap:8px}}
