@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import {administratorKey} from './admin-key.js';
 const serverMode=true;
@@ -19,12 +19,17 @@ const tls = process.env.AMMS_TLS_PFX ? {pfx:await readFile(process.env.AMMS_TLS_
 if (tls && !process.env.AMMS_ACCESS_PUBLIC_URL?.startsWith('https://')) throw new Error('HTTPS requires AMMS_ACCESS_PUBLIC_URL=https://...');
 const serve = tls ? handler=>createHttpsServer(tls,handler) : createServer;
 serve(async (req,res) => {
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Content-Security-Policy',"frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+  res.setHeader('Referrer-Policy','no-referrer');
   try {
     if(api && await api(req,res)) return;
     if(serverMode && req.url.startsWith('/api/')) { res.writeHead(404); res.end(); return; }
     const path = resolve(root, '.' + decodeURIComponent(new URL(req.url,'http://localhost').pathname));
     if (path !== root && !path.startsWith(root + sep)) { res.writeHead(403); res.end(); return; }
-    const target = (await stat(path)).isDirectory() ? resolve(path,'index.html') : path;
+    const target = await realpath((await stat(path)).isDirectory() ? resolve(path,'index.html') : path);
+    const actualRoot=await realpath(root);
+    if (target!==actualRoot && !target.startsWith(actualRoot+sep)) { res.writeHead(403); res.end(); return; }
     const body = await readFile(target);
     res.writeHead(200, { 'content-type': types[extname(target)] || 'application/octet-stream', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(body);
   } catch { res.writeHead(404); res.end('Not found'); }
