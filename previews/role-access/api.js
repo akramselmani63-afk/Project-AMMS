@@ -16,7 +16,7 @@ const failed=new Map();
 const failedAdmin=new Map();
 let pending=Promise.resolve();
 const serial=fn=>{const result=pending.then(fn);pending=result.catch(()=>{});return result;};
-const send=(res,status,data,headers={})=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff',...headers});res.end(JSON.stringify(data));};
+const send=(res,status,data,headers={})=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','x-frame-options':'DENY','content-security-policy':"frame-ancestors 'none'; base-uri 'self'; object-src 'none'",'referrer-policy':'no-referrer',...headers});res.end(JSON.stringify(data));};
 const file=name=>join(dataDir,name);
 async function read(name,fallback) { try { return JSON.parse(await readFile(file(name),'utf8')); } catch(e) { if(e.code==='ENOENT') return fallback; throw e; } }
 async function save(name,value) {
@@ -38,7 +38,7 @@ const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const cookie=req=>String(req.headers.cookie || '').split(';').map(x=>x.trim()).find(x=>x.startsWith('amms_access_session='))?.slice(20);
 function userFor(req,users) {
   const token=cookie(req),session=token && sessions.get(token);
-  if(!session || session.expires<Date.now()) { if(token) sessions.delete(token); return null; }
+  if(!session || session.expires<=Date.now() || session.hash!==users[session.email]?.hash) { if(token) sessions.delete(token); return null; }
   return users[session.email]?.hash ? {email:session.email,...users[session.email],name:personName(users[session.email]),role:activeRole(users[session.email].role)} : null;
 }
 function view(workspace,user,users) {
@@ -63,11 +63,11 @@ const sameOrigin=req=>{try{return !req.headers.origin || new URL(req.headers.ori
 function adminAuthorized(req) {
   if(!adminToken) return false;
   const key=req.socket.remoteAddress || 'unknown',attempt=failedAdmin.get(key)||{count:0,until:0};
-  if(attempt.until>Date.now()) return false;
   const given=Buffer.from(String(req.headers['x-amms-access-preview-admin-token'] || ''));
   const expected=Buffer.from(administratorKey(adminToken));
   const valid=given.length===expected.length && timingSafeEqual(given,expected);
   if(valid) { failedAdmin.delete(key); return true; }
+  if(attempt.until>Date.now()) return false;
   attempt.count++; attempt.until=attempt.count>=5?Date.now()+15*60_000:0; failedAdmin.set(key,attempt);
   return false;
 }
@@ -129,7 +129,7 @@ export async function api(req,res) {
       }
       failed.delete(address);
       const duration=8*60*60;
-      const token=randomBytes(32).toString('hex');sessions.set(token,{email:address,expires:Date.now()+duration*1000});
+      const token=randomBytes(32).toString('hex');sessions.set(token,{email:address,hash:account.hash,expires:Date.now()+duration*1000});
       send(res,200,{user:{name:personName(account),job:account.job || '',role:activeRole(account.role),email:address}},{'set-cookie':`amms_access_session=${token}; HttpOnly; SameSite=Strict; Path=/api${secureCookie}`});return true;
     }
     const user=userFor(req,users);
@@ -142,17 +142,19 @@ export async function api(req,res) {
       if(!command || typeof command.type!=='string' || (command.id!=null && typeof command.id!=='string') || (command.values!=null && (typeof command.values!=='object' || Array.isArray(command.values))) || (command.key!=null && !/^[a-f0-9-]{36}$/.test(command.key))) {send(res,400,{error:'Invalid command.'});return true;}
       if(command.values?.photos && (!Array.isArray(command.values.photos) || command.values.photos.length>4 || command.values.photos.some(photo=>typeof photo?.name!=='string' || photo.name.length>255 || typeof photo.data!=='string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo.data) || photo.data.length>11_200_000))) {send(res,400,{error:'Invalid photo attachment.'});return true;}
       const result=await serial(async()=>{
+        const currentUsers=await read('users.json',{}),activeUser=userFor(req,currentUsers);
+        if(!activeUser) throw Object.assign(new Error('Sign in required.'),{status:401});
         const current=await workspace();
         const receipt=command.key && `${user.email}:${command.key}`;
-        if(receipt && current.appliedCommands?.includes(receipt)) return view(current,user,users);
-        current.role=user.role;current.actor=user.name;current.actorEmail=user.email;current.actorJob=user.job || '';
+        if(receipt && current.appliedCommands?.includes(receipt)) return view(current,activeUser,currentUsers);
+        current.role=activeUser.role;current.actor=activeUser.name;current.actorEmail=activeUser.email;current.actorJob=activeUser.job || '';
         const before=recordIds(current);
         try { applyCommand(current,command); if(command.created) assignCreated(current,before,command.created); }
         catch(e) { e.status=409; throw e; }
         if(receipt) current.appliedCommands=[...(current.appliedCommands || []).slice(-999),receipt];
         current.revision=(current.revision||0)+1;
         await save('workspace.json',current);
-        return view(current,user,users);
+        return view(current,activeUser,currentUsers);
       });
       send(res,200,{workspace:result});return true;
     }

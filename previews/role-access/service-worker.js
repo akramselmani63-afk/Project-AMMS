@@ -1,7 +1,7 @@
-const CACHE = 'agrimaint-shell-v6';
+const CACHE = 'agrimaint-shell-v7';
 const FILES = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './src/app.js', './src/commands.js', './src/data.js', './src/workflow.js', './src/storage.js', './src/photos.js', './src/source-assets.js',
+  './src/app.js', './src/access.js', './src/commands.js', './src/data.js', './src/workflow.js', './src/storage.js', './src/photos.js', './src/source-assets.js',
   './assets/agridiam-logo.png', './assets/amms-logo-monitoring.png', './assets/amms-app-icon-green-a.png',
   './assets/amms-pwa-192.png', './assets/amms-pwa-512.png',
   './assets/notifications.js', './assets/notifications.css', './src/statistics.js'

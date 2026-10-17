@@ -42,6 +42,7 @@ test('company server shares records and enforces account roles',async()=>{
   try {
     assert.equal((await request('/api/signup','POST',{email:'employee@example.test',password:'a strong test password',invite:'wrong'})).status,400);
     assert.equal((await request('/api/admin/users')).status,401);
+    for(let i=0;i<5;i++) assert.equal((await request('/api/admin/users')).status,401);
     const listed=await request('/api/admin/users','GET',null,'',administratorKey('test-admin-secret'));
     assert.equal(listed.status,200);
     assert.equal(listed.data.users.some(user=>'hash' in user || 'inviteHash' in user),false);

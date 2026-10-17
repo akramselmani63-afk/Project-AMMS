@@ -152,7 +152,7 @@ export function addRequest(db,v) {
 export function canRemoveIntervention(db,r) {
   if(!r || !can(db.role,'request')) return false;
   const actor=String(db.actor || '').trim();
-  const requester=actor && actor===(r.createdBy || r.reportedBy);
+  const requester=db.actorEmail ? db.actorEmail===r.reportedEmail : actor && actor===(r.createdBy || r.reportedBy);
   if(!requester && !maintenance.includes(db.role)) return false;
   const linked=db.workOrders.filter(w=>w.requestId===r.id);
   if(r.status==='Closed' || linked.some(w=>w.startedAt || ['In progress','Waiting for parts','Closed'].includes(w.status))) return false;
