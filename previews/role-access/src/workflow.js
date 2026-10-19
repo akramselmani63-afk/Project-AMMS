@@ -202,6 +202,30 @@ export function reviewRequest(db,id,decision,v={}) {
     for(const w of linked) if(w.status==='Awaiting approval') w.status='Planned';
   }
 }
+export function skipHolidayApprovals(db,unavailable) {
+  let changed=false;
+  const event=role=>({at:now(),role,actor:'agriMAINT',job:'',action:'Approval skipped — holiday',skipped:true,note:unavailable[role]});
+  for(const r of db.requests) {
+    if(!reviewStages.includes(r.status)) continue;
+    for(const [key,role] of [['approval','Maintenance Responsible'],['hseApproval',safetyReviewer(db,r)]]) {
+      if(!r[key] && unavailable[role]) { r[key]=event(role);(r.history ||= []).push(r[key]);changed=true; }
+    }
+    r.status=approvalStatus(r);
+    if(r.status==='Approved') {
+      const linked=db.workOrders.filter(w=>w.requestId===r.id);
+      if(!linked.length) addApprovedWork(db,r);
+      for(const w of linked) if(w.status==='Awaiting approval') w.status='Planned';
+    }
+  }
+  for(const p of db.partRequests || []) {
+    if(!unavailable['Maintenance Responsible'] || !['Responsible review','Order approval'].includes(p.status)) continue;
+    const entry=event('Maintenance Responsible');
+    if(p.status==='Order approval') { p.orderApproval=entry;p.status='Ordered'; }
+    else p.status='Purchasing';
+    (p.history ||= []).push(entry);changed=true;
+  }
+  return changed;
+}
 function maintenanceParticipants(values) {
   const participants=values == null?['Maintenance Engineer']:values;
   requireValue(Array.isArray(participants) && participants.length && participants.every(role=>maintenance.includes(role)),'Select maintenance participants.');
@@ -361,6 +385,7 @@ export function notificationFeed(db) {
     const visibleEvent=h=>{
       if(db.role==='Employee') return collection==='requests' && own && ['Submitted','Returned','Rejected','Closed','Closed with work order'].includes(h.action);
       if(db.role==='Viewer') return collection==='requests' && ['Closed','Closed with work order'].includes(h.action) || collection==='workOrders' && !request && h.action==='Work completed' || collection==='partRequests' && ['Accepted','Closed'].includes(h.action);
+      if(h.skipped && ['Maintenance Engineer','Maintenance Responsible','Production Responsible','HSE','Purchasing Department'].includes(db.role)) return true;
       if(db.role==='Purchasing Department') return ['Purchasing','Responsible approval','Purchase authorized','Order returned for revision','Delivery received','Technical acceptance','Partial acceptance','Accepted','Closed'].includes(h.action);
       if(db.role==='Production Responsible') return collection==='requests' && ['Submitted','Assessed','Site risk assessment submitted','Production approval','Returned','Rejected','Closed','Closed with work order'].includes(h.action);
       if(db.role==='HSE') return ['Assessed','Site risk assessment submitted','Submitted to HSE','HSE approval'].includes(h.action) || reviewedByHSE && ['Closed','Closed with work order','Work completed'].includes(h.action);

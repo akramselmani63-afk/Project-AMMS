@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {validHoliday,unavailableApprovers} from './holidays.js';
+import {skipHolidayApprovals} from './src/workflow.js';
+test('holiday dates are real dates and return date restores availability',()=>{
+ for(const value of [undefined,{},'holiday',{departure:'2026-02-30',returnDate:'2026-03-05'},{departure:'2026-10-20',returnDate:'2026-10-20'}]) assert.ok(!validHoliday(value));
+ assert.ok(validHoliday(null));
+ const account={hash:'active',role:'HSE',name:'Safety',holiday:{departure:'2026-10-20',returnDate:'2026-10-25'}};
+ assert.deepEqual(unavailableApprovers({a:account},'2026-10-19'),{});
+ assert.ok(unavailableApprovers({a:account},'2026-10-20').HSE);
+ assert.deepEqual(unavailableApprovers({a:account},'2026-10-25'),{});
+ assert.deepEqual(unavailableApprovers({a:account,b:{hash:'active',role:'HSE'}},'2026-10-21'),{});
+ assert.deepEqual(unavailableApprovers({},'2026-10-21'),{});
+});
+test('holiday skips are audited, respect assessment and create linked work only once',()=>{
+ const db={equipment:[{id:'u',name:'Utilities'},{id:'p',name:'Production'}],requests:[{id:'r',equipmentId:'u',status:'Approval review'},{id:'new',equipmentId:'u',status:'Submitted'},{id:'site',equipmentId:'u',status:'Site risk assessment'},{id:'prod',equipmentId:'p',status:'Approval review'}],workOrders:[],partRequests:[{status:'Responsible review'},{status:'Order approval'},{status:'Technical acceptance'}]};
+ const absent={'Maintenance Responsible':'Responsible (20 → 25)',HSE:'Safety (20 → 25)'};
+ assert.equal(skipHolidayApprovals(db,absent),true);
+ assert.equal(db.requests[0].status,'Approved');
+ assert.equal(db.requests[0].hseApproval.skipped,true);
+ assert.equal(db.requests[0].history.length,2);
+ assert.equal(db.requests[1].status,'Submitted');
+ assert.equal(db.requests[2].status,'Site risk assessment');
+ assert.equal(db.requests[3].status,'HSE review');
+ assert.equal(db.requests[3].hseApproval,undefined,'HSE absence does not bypass Production approval');
+ assert.equal(db.workOrders.length,1);
+ assert.equal(db.partRequests[0].status,'Purchasing');
+ assert.equal(db.partRequests[1].status,'Ordered');
+ assert.equal(db.partRequests[1].orderApproval.skipped,true);
+ assert.equal(db.partRequests[2].status,'Technical acceptance');
+ assert.equal(skipHolidayApprovals(db,absent),false);
+ assert.equal(db.workOrders.length,1);
+ assert.equal(skipHolidayApprovals(db,{}),false);
+ assert.equal(db.requests[0].history.length,2,'returning does not erase historical skips');
+});
