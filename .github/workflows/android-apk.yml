@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   pull_request:
-    branches: [main, feat/maintenance-workflows]
+    branches: [main, feat/maintenance-workflows, fix/agrimaint-security-review-2026-10-17]
     paths:
       - "previews/role-access/**"
       - "android/**"

@@ -705,3 +705,22 @@ button.facepile-avatar:focus-visible{position:relative;z-index:1}
   .top-actions .signout-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px;font-size:13px}
 }
 @media(max-width:540px){.topbar .search{display:none}.top-actions{gap:8px}}
+.password-input{position:relative;display:flex;align-items:center;width:100%}
+.password-input input{width:100%;padding-right:48px}
+.password-input button{position:absolute;right:4px;top:4px;bottom:4px;width:40px;border:0;background:transparent;color:#17466c;cursor:pointer;border-radius:6px}
+.password-input button:focus-visible{outline:2px solid #17466c;outline-offset:2px}
+.password-input svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7}
+.password-meter{height:5px;background:#dce3e9;border-radius:4px;overflow:hidden;margin:3px 0 6px}
+.password-meter span{height:100%;display:block;background:#a12727;transition:width .15s}
+.password-meter span[data-score="2"]{background:#a94c00}.password-meter span[data-score="3"]{background:#8a6500}.password-meter span[data-score="4"]{background:#16713e}
+.password-strength{font-size:13px;margin:0 0 5px;color:#284457}
+.password-requirements{list-style:none;padding:0;margin:0 0 8px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;color:#52616c}
+.password-requirements li{display:flex;align-items:center;gap:5px}.password-requirements .met{color:#146537}
+.password-requirements svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2}
+@media(max-width:380px){.password-requirements{font-size:11px;gap:3px 6px}}
+@media(prefers-reduced-motion:reduce){.password-meter span{transition:none}}
+/* Edge adds a native reveal button beside the application's visibility control. */
+.password-input input::-ms-reveal{display:none}
+#holiday-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+#holiday-form .actions,#holiday-message{grid-column:1/-1}
+@media(max-width:540px){#holiday-form{grid-template-columns:1fr}}

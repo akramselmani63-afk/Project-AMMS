@@ -24,6 +24,7 @@ const image = async path => {
 const logo = `data:image/png;base64,${(await image('assets/agridiam-logo.png')).toString('base64')}`;
 const appIcon = `data:image/png;base64,${(await image('assets/amms-app-icon-green-a.png')).toString('base64')}`;
 const openingLogo = `data:image/png;base64,${(await image('assets/amms-logo-monitoring.png')).toString('base64')}`;
+const passwords = await source('src/password.js', '', ['passwordChecks','validPassword']);
 const assets = await source('src/source-assets.js', '', ['sourceTitle', 'sourceEquipment']);
 const data = await source('src/data.js', 'const {sourceEquipment} = assets;', ['STORAGE_KEY', 'seed', 'load', 'save', 'nextId', 'equipmentPath', 'sortedEquipment']);
 const workflow = await source('src/workflow.js', 'const {load: loadBase, seed: seedBase, nextId} = data;', [
@@ -76,7 +77,7 @@ const storage = (() => {
   return {readWorkspace, writeWorkspace};
 })();`;
 
-const script = `const assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst statistics = ${statistics};\nconst access = ${access};\nconst commandsModule = ${commands};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {maintenanceStats,equipmentFailureTrend} = statistics;\nconst {applyCommand,recordIds,assignCreated,newRecordIds} = commandsModule;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readServerCache,writeServerCache} = indexed;\nconst {readPhotos,readProforma} = photosModule;\nconst {canSeePage,workspaceForRole}=access;\n${app}\n})();`;
+const script = `const {passwordChecks,validPassword} = ${passwords};\nconst assets = ${assets};\nconst data = ${data};\nconst workflow = ${workflow};\nconst statistics = ${statistics};\nconst access = ${access};\nconst commandsModule = ${commands};\nconst photosModule = ${photos};\nconst indexed = ${indexed};\n${storage}\n(async () => {\nconst flow = workflow;\nconst {maintenanceStats,equipmentFailureTrend} = statistics;\nconst {applyCommand,recordIds,assignCreated,newRecordIds} = commandsModule;\nconst {equipmentPath, sortedEquipment} = data;\nconst {readWorkspace, writeWorkspace} = storage;\nconst {readServerCache,writeServerCache} = indexed;\nconst {readPhotos,readProforma} = photosModule;\nconst {canSeePage,workspaceForRole}=access;\n${app}\n})();`;
 const notifications = await read('assets/notifications.js');
 const css = (await read('assets/notifications.css')) + (await read('styles.css')).replaceAll("./assets/agridiam-logo.png", logo);
 const startup = `const showStartupError = event => { const app = document.getElementById('app'); if (app && !app.querySelector('.shell')) { const message = event.reason?.message || event.message || 'Unknown startup error'; app.innerHTML = '<main style="font:16px Arial,sans-serif;padding:32px;max-width:700px"><h1>agriMAINT could not open / agriMAINT ne peut pas démarrer</h1><p>' + String(message).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</p></main>'; app.removeAttribute('inert'); document.getElementById('splash')?.remove(); } }; window.addEventListener('error', showStartupError); window.addEventListener('unhandledrejection', showStartupError);`;
